@@ -2,7 +2,7 @@
 A roll20 API Script for DND 5e combat across the board.
 
 ## Current Functionality
-1. Handle combat rolls and saving throws for:
+1. Handle attack rolls, saving throws, and damage dealing for:
     * Direct Weapon Attacks
     * Direct Spell Attacks
     * AOE Spell Attacks
