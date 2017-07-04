@@ -68,7 +68,7 @@ var CombatHandler = CombatHandler || (function() {
         });
     },
     
-    promptButtonArray = function(listPromptableItems,listCommandNames){
+    promptButtonArray = function(promptName, listPromptableItems,listCommandNames){
         var stringToSend, 
             buttonArray = [];
             /*
@@ -89,7 +89,7 @@ var CombatHandler = CombatHandler || (function() {
         stringToSend = '/w "' + currentPlayerDisplayName + '" '
             +'<div style="border: 1px solid black; background-color: white; padding: 3px 3px;">'
             +'<div style="font-weight: bold; border-bottom: 1px solid black;font-size: 130%;">'
-            +'Prompt'
+            +promptName
             +'</div>';
         for(var i = 0; i < buttonArray.length; i++){
             stringToSend += buttonArray[i];
@@ -237,7 +237,7 @@ var CombatHandler = CombatHandler || (function() {
         log('It\'s now ' + currentTurnCharacter.get('name') + '\'s turn!' );
         log('This character is controlled by player ' + currentTurnPlayer.get('displayname'))
         sendChat('Combat Handler','/w "'+ currentTurnPlayer.get('displayname') + '" It\'s your turn as ' + currentTurnCharacter.get('name'));
-        promptButtonArray(generateTurnOptions(),generateTurnOptionCommands());
+        promptButtonArray("Select an action", generateTurnOptions(),generateTurnOptionCommands());
     },
     
     ResetTokenTurnValues = function(currentTurnToken){
@@ -334,7 +334,7 @@ var CombatHandler = CombatHandler || (function() {
         }
         else{
             switch(args[1]){
-                case "cone": promptButtonArray(["North","South","East","West","Northeast","Northwest","Southeast","Southwest"], 
+                case "cone": promptButtonArray("Select a direction", ["North","South","East","West","Northeast","Northwest","Southeast","Southwest"], 
                 ["up","down","right","left","upright","upleft","downright","downleft"]);
                 bIsWaitingOnResponse = true;
                 responseCallbackFunction = coneDirectionPromptCallback;
