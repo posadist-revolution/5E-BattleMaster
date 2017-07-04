@@ -1,10 +1,13 @@
 var CombatHandler = CombatHandler || (function() {
     'use strict';
     
-    var bInCombat, bHasTakenAction, bHasTakenBonusAction, bIsWaitingOnRoll,
+    var bInCombat, bHasTakenAction, bHasTakenBonusAction, bIsWaitingOnRoll, bIsWaitingOnResponse, responseCallbackFunction,
     iMoveSpeedTotal, iMoveSpeedRemaining, iXStart, iYStart, iXCurrent, iYCurrent,
     currentPlayerDisplayName, currentTurnPlayer, currentTurnCharacter, currentTurnToken,
     target,
+    direction,
+    range,
+    listTokensInEncounter = [],
     sPreviousAction, sPreviousBonusAction,
     listRollCallbackFunctions = [],
     listPlayerIDsWaitingOnRollFrom = [],
@@ -65,11 +68,10 @@ var CombatHandler = CombatHandler || (function() {
         });
     },
     
-    prompt = function(listPromptableItems){
+    promptButtonArray = function(listPromptableItems,listCommandNames){
         var stringToSend, 
-            buttonArray = [],
-            listCommandNames = [];
-            
+            buttonArray = [];
+            /*
         for(var i = 0; i < listPromptableItems.length; i++){
             var tempString = listPromptableItems[i];
             while(tempString.indexOf(' ') != -1){
@@ -79,6 +81,7 @@ var CombatHandler = CombatHandler || (function() {
             listCommandNames[i] = tempString;
             log(tempString);
         }
+        */
         
         for(var i = 0; i < listPromptableItems.length; i++){
             buttonArray[i] = makeButton('!combat ' + listCommandNames[i], listPromptableItems[i], '#CDAE88', 'black');
@@ -93,6 +96,10 @@ var CombatHandler = CombatHandler || (function() {
         }
         stringToSend += '</div>';
         sendChat('CombatHandler', stringToSend);
+    },
+
+    promptLocation = function(xToAssign, yToAssign){
+        
     },
     
     findCurrentTurnToken = function(turnorder) {
@@ -152,13 +159,36 @@ var CombatHandler = CombatHandler || (function() {
 		switch(args[0]) {
 		    case '!combat':
 		        switch(args[1]){
-		            case 'start': StartCombat(); break;
-		            case 'stop' : StopCombat(); break;
-		            case 'test' : prompt('gm', ['Option 1','Option 2', 'Option 3']); break;
-		            case 'weaponattack': WeaponAttack(getObj(msg.selected[0]._type, msg.selected[0]._id)); break;
-		            case 'directspell': DirectSpellAttack(getObj(msg.selected[0]._type, msg.selected[0]._id)); break;
-		            case 'move': break;
-		            case 'aoespell': AOESpellAttack(); break;
+		            case 'start': StartCombat(); 
+                    break;
+		            case 'stop' : StopCombat(); 
+                    break;
+		            case 'test' : promptButtonArray('gm', ['Option 1','Option 2', 'Option 3']); 
+                    break;
+		            case 'weaponattack': WeaponAttack(getObj(msg.selected[0]._type, msg.selected[0]._id)); 
+                    break;
+		            case 'directspell': DirectSpellAttack(getObj(msg.selected[0]._type, msg.selected[0]._id)); 
+                    break;
+		            case 'move': 
+                    break;
+		            case 'aoespell': AOESpellAttack(); 
+                    break;
+                    case 'up': direction = args[1]; bIsWaitingOnResponse = false; responseCallbackFunction();
+                    break;
+                    case 'down': direction = args[1]; bIsWaitingOnResponse = false; responseCallbackFunction();
+                    break;
+                    case 'left': direction = args[1]; bIsWaitingOnResponse = false; responseCallbackFunction();
+                    break;
+                    case 'right': direction = args[1]; bIsWaitingOnResponse = false; responseCallbackFunction();
+                    break;
+                    case 'upright': direction = args[1]; bIsWaitingOnResponse = false; responseCallbackFunction();
+                    break;
+                    case 'downleft': direction = args[1]; bIsWaitingOnResponse = false; responseCallbackFunction();
+                    break;
+                    case 'upleft': direction = args[1]; bIsWaitingOnResponse = false; responseCallbackFunction();
+                    break;
+                    case 'downright': direction = args[1]; bIsWaitingOnResponse = false; responseCallbackFunction();
+                    break;
 		            //default: break;
 		        }break;
 		}
@@ -166,6 +196,7 @@ var CombatHandler = CombatHandler || (function() {
     
     StartCombat = function(){
         bInCombat = true;
+        bIsWaitingOnResponse = false;
         log('Combat Started!');
         sendChat("Combat Handler", "/w GM Combat Started!")
         /*
@@ -177,17 +208,28 @@ var CombatHandler = CombatHandler || (function() {
     
     StopCombat = function(){
         bInCombat = false;
+        bIsWaitingOnResponse = false;
         log('Combat stopped!');
         sendChat("Combat Handler", "/w GM Combat Stopped!")
     },
     
     TurnChange = function(){
         log('The turn has changed!');
+        var turnorder;
         //Find all the information on whose turn it is
         currentTurnToken = findCurrentTurnToken(Campaign().get('turnorder'));
         currentTurnCharacter = getObj('character',currentTurnToken.get('represents'));
         currentTurnPlayer = getObj('player',findWhoIsControlling(currentTurnCharacter));
         currentPlayerDisplayName = currentTurnPlayer.get('displayname');
+        if (!turnorder) 
+			{turnorder = Campaign().get('turnorder');}
+		if (!turnorder) 
+			{return undefined;}
+		if (typeof(turnorder) === 'string') 
+			{turnorder = JSON.parse(turnorder);}
+        _.each(turnorder, function(current){
+            listTokensInEncounter.push(getObj("graphic",current.id));
+        });
         //Reset all the variables for the new turn
         ResetTokenTurnValues(currentTurnToken);
         ResetCharacterTurnValues(currentTurnCharacter);
@@ -195,7 +237,7 @@ var CombatHandler = CombatHandler || (function() {
         log('It\'s now ' + currentTurnCharacter.get('name') + '\'s turn!' );
         log('This character is controlled by player ' + currentTurnPlayer.get('displayname'))
         sendChat('Combat Handler','/w "'+ currentTurnPlayer.get('displayname') + '" It\'s your turn as ' + currentTurnCharacter.get('name'));
-        prompt(generateTurnOptions());
+        promptButtonArray(generateTurnOptions(),generateTurnOptionCommands());
     },
     
     ResetTokenTurnValues = function(currentTurnToken){
@@ -284,16 +326,237 @@ var CombatHandler = CombatHandler || (function() {
     },
     
     AOESpellRollCallback = function(rollMsg){
-        
+        var rangeString = rollMsg.content.slice(rollMsg.content.indexOf("{{range=") + 8, rollMsg.content.indexOf("}} {{damage=")),
+        x = currentTurnToken.get('left'), y = currentTurnToken.get('top'),
+        args = rangeString.toLowerCase().split(/\s+/);
+        if(args[0]!= "self"){
+            log("Not self targeted!");
+        }
+        else{
+            switch(args[1]){
+                case "cone": promptButtonArray(["North","South","East","West","Northeast","Northwest","Southeast","Southwest"], 
+                ["up","down","right","left","upright","upleft","downright","downleft"]);
+                bIsWaitingOnResponse = true;
+                responseCallbackFunction = coneDirectionPromptCallback;
+                range = args[2];
+                break;
+                case "line": var direction; promptDirection(direction); break;
+                case "sphere": break;
+                case "cube": break;
+                case "cylinder": break;
+            }
+        }
+        log("Attempting AOE Spell!");
+        log("Target: " + rangeString.toLowerCase());
+    },
+
+    distanceBetween = function(originX, originY, finalX, finalY){
+        return Math.sqrt((originX - finalX)^2 + (originY - finalY)^2);
+    },
+
+    coneDirectionPromptCallback = function(){
+        log("Casting " + direction);
+        var xMod = 0, yMod = 0,
+        x = currentTurnToken.get("left"), y = currentTurnToken.get("top");
+        if(direction.toLowerCase().indexOf('up') != -1){
+            yMod = -35;
+        }
+        else if(direction.toLowerCase().indexOf('down') != -1){
+            yMod = 35;
+        }
+        if(direction.toLowerCase().indexOf('left') != -1){
+            xMod = -35;
+        }
+        else if (direction.toLowerCase().indexOf('right') != -1){
+            xMod = 35;
+        }
+        _.each(findAllTokensInCone(x + xMod, y + yMod, direction, range), function(token){
+            log("Found token " + token.get("name") + "In cone!");
+            listPlayerIDsWaitingOnRollFrom.push(token.findWhoIsControlling().id);
+            listRollCallbackFunctions.push(SavingThrowAgainstDamageRollCallback());
+        });
     },
     
-    SavingThrowRollCallback = function(rollMsg){
+    findAllTokensInCone = function(originX, originY, direction, range){
+        var listTokensToReturn = [],
+        line1YofX, line2YofX,
+        line1XofY, line2XofY,
+        bLine1XNeg, bLine2XNeg,
+        bLine1YNeg, bLine2YNeg;
+        var tokenIsConstrainedByLines = function(token, line1XofY, line1YofX, line2XofY, line2YofX, bLine1XNeg, bLine1YNeg, bLine2XNeg, bLine2YNeg, range){
+            var bValueToReturn, tokenX = token.get('left'), tokenY = token.get('top');
+            bValueToReturn = (bLine1XNeg && tokenX <= line1XofY(tokenY) || (!bLine1XNeg) && tokenX >= line1XofY(tokenY));
+            bValueToReturn = bValueToReturn && (bLine1YNeg && tokenY <= line1YofX(tokenX) || (!bLine1YNeg) && tokenY >= line1YofX(tokenX));
+            bValueToReturn = bValueToReturn && (bLine2XNeg && tokenX <= line2XofY(tokenY) || (!bLine2XNeg) && tokenX >= line2XofY(tokenY));
+            bValueToReturn = bValueToReturn && (bLine2YNeg && tokenY <= line2YofX(tokenX) || (!bLine2YNeg) && tokenY >= line2YofX(tokenX));
+            bValueToReturn = bValueToReturn && (distanceBetween(originX, originY, tokenX, tokenY) <= range)
+            return bValueToReturn;
+        }
+        switch (direction){
+            case "up": 
+                bLine1XNeg = false; bLine1YNeg = true;
+                bLine2XNeg = true; bLine2YNeg = true;
+                line1YofX = function(x){
+                    return ((x - originX)*2) + originY;
+                }
+                line2YofX = function(x){
+                    return -((x - originX)*2) + originY;
+                }
+                line1XofY = function(y){
+                    return -((y - originY)/2) + originX;
+                }
+                line2XofY= function(y){
+                    return ((y - originY)/2) + originX;
+                }
+            break;
+
+            case "down": 
+                bLine1XNeg = false; bLine1YNeg = false;
+                bLine2XNeg = true; bLine2YNeg = false;
+                line1YofX = function(x){
+                    return -((x - originX)*2) + originY;
+                }
+                line2YofX = function(x){
+                    return ((x - originX)*2) + originY;
+                }
+                line1XofY = function(y){
+                    return -((y - originY)/2) + originX;
+                }
+                line2XofY= function(y){
+                    return ((y - originY)/2) + originX;
+                }
+            break;
+
+            case "left": 
+                bLine1XNeg = true; bLine1YNeg = true;
+                bLine2XNeg = true; bLine2YNeg = false;
+                line1YofX = function(x){
+                    return -((x - originX)/2) + originY;
+                }
+                line2YofX = function(x){
+                    return ((x - originX)/2) + originY;
+                }
+                line1XofY = function(y){
+                    return -((y - originY)*2) + originX;
+                }
+                line2XofY= function(y){
+                    return ((y - originY)*2) + originX;
+                }
+            break;
+
+            case "right": 
+                bLine1XNeg = false; bLine1YNeg = false;
+                bLine2XNeg = false; bLine2YNeg = true;
+                line1YofX = function(x){
+                    return -((x - originX)/2) + originY;
+                }
+                line2YofX = function(x){
+                    return ((x - originX)/2) + originY;
+                }
+                line1XofY = function(y){
+                    return -((y - originY)*2) + originX;
+                }
+                line2XofY= function(y){
+                    return ((y - originY)*2) + originX;
+                }
+            break;
+
+            case "upleft": 
+                bLine1XNeg = false; bLine1YNeg = true;
+                bLine2XNeg = true; bLine2YNeg = false;
+                line1YofX = function(x){
+                    return ((x - originX)/3) + originY;
+                }
+                line2YofX = function(x){
+                    return ((x - originX)*3) + originY;
+                }
+                line1XofY = function(y){
+                    return ((y - originY)*3) + originX;
+                }
+                line2XofY= function(y){
+                    return ((y - originY)/3) + originX;
+                }
+            break;
+
+            case "upright": 
+                bLine1XNeg = false; bLine1YNeg = false;
+                bLine2XNeg = true; bLine2YNeg = true;
+                line1YofX = function(x){
+                    return -((x - originX)*3) + originY;
+                }
+                line2YofX = function(x){
+                    return -((x - originX)/3) + originY;
+                }
+                line1XofY = function(y){
+                    return -((y - originY)/3) + originX;
+                }
+                line2XofY= function(y){
+                    return -((y - originY)*3) + originX;
+                }
+            break;
+
+            case "downleft": 
+                bLine1XNeg = true; bLine1YNeg = true;
+                bLine2XNeg = true; bLine2YNeg = false;
+                line1YofX = function(x){
+                    return -((x - originX)*3) + originY;
+                }
+                line2YofX = function(x){
+                    return -((x - originX)/3) + originY;
+                }
+                line1XofY = function(y){
+                    return -((y - originY)/3) + originX;
+                }
+                line2XofY= function(y){
+                    return -((y - originY)*3) + originX;
+                }
+            break;
+
+            case "downright": 
+                bLine1XNeg = true; bLine1YNeg = false;
+                bLine2XNeg = false; bLine2YNeg = true;
+                line1YofX = function(x){
+                    return ((x - originX)/3) + originY;
+                }
+                line2YofX = function(x){
+                    return ((x - originX)*3) + originY;
+                }
+                line1XofY = function(y){
+                    return ((y - originY)*3) + originX;
+                }
+                line2XofY= function(y){
+                    return ((y - originY)/3) + originX;
+                }
+            break;
+        }
+
+        _.each(listTokensInEncounter, function(token){
+            if(tokenIsConstrainedByLines(token, line1XofY, line1YofX, line2XofY, line2YofX, bLine1XNeg, bLine1YNeg, bLine2XNeg, bLine2YNeg, range)){
+                listTokensToReturn.push(token);
+            }
+        });
+    },
+    findAllTokensInSphere = function(x,y,range){
+
+    },
+    findAllTokensInLine = function(x,y,targetX,targetY,range){
+
+    },
+    findAllTokensInCube = function(x,y,range){
+
+    },
+    findAllTokensInCylinder = function(x,y,range,height){
+
+    },
+    
+    SavingThrowAgainstDamageRollCallback = function(rollMsg, token){
         var indexSaveAttr = rollMsg.content.indexOf("{{saveAttr="),
         indexSaveDesc = rollMsg.content.indexOf('}} {{savedesc='),
         indexSaveDc = rollMsg.content.indexOf('{{mod=DC'),
         rollAttribute = rollMsg.content.slice(indexSaveAttr + 11, indexSaveDesc),
         rollEffectsDesc = rollMsg.content.slice(indexSaveDesc + 14, rollMsg.content.indexOf('}} {{savedc= $[[')),
         rollDC = parseInt(rollMsg.content.slice(indexSaveDc + 8, rollMsg.content.indexOf('}} {{rname=')));
+
     },
     
     applyDamage = function(dmgAmt, dmgType, targetToken, targetCharacter){
@@ -325,6 +588,16 @@ var CombatHandler = CombatHandler || (function() {
             'Direct Spell',
             'AOE Spell',
             'Move'
+        ];
+        return optionsToReturn;
+    },
+
+    generateTurnOptionCommands = function(){
+        var optionsToReturn = [
+            'weaponattack',
+            'directspell',
+            'aoespell',
+            'move'
         ];
         return optionsToReturn;
     },
