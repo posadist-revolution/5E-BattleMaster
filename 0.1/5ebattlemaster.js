@@ -4,6 +4,7 @@ var CombatHandler = CombatHandler || (function() {
     var bInCombat, bHasTakenAction, bHasTakenBonusAction, bIsWaitingOnRoll, bIsWaitingOnResponse, responseCallbackFunction,
     iMoveSpeedTotal, iMoveSpeedRemaining, iXStart, iYStart, iXCurrent, iYCurrent,
     currentPlayerDisplayName, currentTurnPlayer, currentTurnCharacter, currentTurnToken,
+    currentlyCastingSpellRoll,
     target,
     direction,
     range,
@@ -326,6 +327,7 @@ var CombatHandler = CombatHandler || (function() {
     },
     
     AOESpellRollCallback = function(rollMsg){
+        currentlyCastingSpellRoll = rollMsg;
         var rangeString = rollMsg.content.slice(rollMsg.content.indexOf("{{range=") + 8, rollMsg.content.indexOf("}} {{damage=")),
         x = currentTurnToken.get('left'), y = currentTurnToken.get('top'),
         args = rangeString.toLowerCase().split(/\s+/);
@@ -371,11 +373,15 @@ var CombatHandler = CombatHandler || (function() {
         else if (direction.toLowerCase().indexOf('right') != -1){
             xMod = 35;
         }
-        _.each(findAllTokensInCone(x + xMod, y + yMod, direction, range), function(token){
-            log("Found token " + token.get("name") + "In cone!");
-            listPlayerIDsWaitingOnRollFrom.push(findWhoIsControlling(getObj('character',token.get('represents'))).id);
-            listRollCallbackFunctions.push(SavingThrowAgainstDamageRollCallback());
-        });
+        _.each(findAllTokensInCone(x + xMod, y + yMod, direction, range), spellEffects());
+    },
+
+    spellEffects = function(token){
+        log("Found token " + token.get("name") + "In cone!");
+        var playerID = findWhoIsControlling(getObj('character',token.get('represents'))).id
+        listPlayerIDsWaitingOnRollFrom.push(playerID);
+        sendChat("Combat Handler", '/w "' + getObj('player',playerID).get("displayname") + '" Please roll a ' + currentlyCastingSpellRoll + ' saving throw!');
+        listRollCallbackFunctions.push(SavingThrowAgainstDamageRollCallback());
     },
 
     distanceToPixels = function(dist) {
@@ -544,7 +550,7 @@ var CombatHandler = CombatHandler || (function() {
         });
         return listTokensToReturn;
     },
-    
+
     findAllTokensInSphere = function(x,y,range){
 
     },
