@@ -380,7 +380,11 @@ var CombatHandler = CombatHandler || (function() {
         log("Found token " + token.get("name") + " in cone!");
         var playerID = findWhoIsControlling(getObj('character',token.get('represents')));
         log("Associated player: " + playerID);
-        sendChat("BattleMaster", '/w "' + getObj('player',playerID).get("displayname") + '" Please roll a ' + currentlyCastingSpellRoll + ' saving throw for ' + token.get("name"));
+        var saveAttrIndex = currentlyCastingSpellRoll.content.indexOf("{{saveattr=") + 11, saveDescIndex = currentlyCastingSpellRoll.content.indexOf('}} {{savedesc=');
+        log("First index: " + saveAttrIndex);
+        log("Second index: " + saveDescIndex);
+        log(currentlyCastingSpellRoll.content);
+        sendChat("BattleMaster", '/w "' + getObj('player',playerID).get("displayname") + '" Please roll a ' + currentlyCastingSpellRoll.content.slice(saveAttrIndex,saveDescIndex) + ' saving throw for ' + token.get("name"));
         listPlayerIDsWaitingOnRollFrom.push(playerID);
         listRollCallbackFunctions.push(SavingThrowAgainstDamageRollCallback);
     },
@@ -549,6 +553,9 @@ var CombatHandler = CombatHandler || (function() {
                 listTokensToReturn.push(token);
                 log(token.get("name") + " is within the cone!");
             }
+            else{
+                log(token.get('name') + " is outside the cone.");
+            }
         });
         return listTokensToReturn;
     },
@@ -567,12 +574,12 @@ var CombatHandler = CombatHandler || (function() {
     },
     
     SavingThrowAgainstDamageRollCallback = function(){
-        var indexSaveAttr = rollMsg.content.indexOf("{{saveAttr="),
-        indexSaveDesc = rollMsg.content.indexOf('}} {{savedesc='),
-        indexSaveDc = rollMsg.content.indexOf('{{mod=DC'),
-        rollAttribute = rollMsg.content.slice(indexSaveAttr + 11, indexSaveDesc),
-        rollEffectsDesc = rollMsg.content.slice(indexSaveDesc + 14, rollMsg.content.indexOf('}} {{savedc= $[[')),
-        rollDC = parseInt(rollMsg.content.slice(indexSaveDc + 8, rollMsg.content.indexOf('}} {{rname=')));
+        var indexSaveAttr = currentlyCastingSpellRoll.content.indexOf("{{saveattr="),
+        indexSaveDesc = currentlyCastingSpellRoll.content.indexOf('}} {{savedesc='),
+        indexSaveDc = currentlyCastingSpellRoll.content.indexOf('{{mod=DC'),
+        rollAttribute = currentlyCastingSpellRoll.content.slice(indexSaveAttr + 11, indexSaveDesc),
+        rollEffectsDesc = currentlyCastingSpellRoll.content.slice(indexSaveDesc + 14, currentlyCastingSpellRoll.content.indexOf('}} {{savedc= $[[')),
+        rollDC = parseInt(currentlyCastingSpellRoll.content.slice(indexSaveDc + 8, currentlyCastingSpellRoll.content.indexOf('}} {{rname=')));
 
     },
     
