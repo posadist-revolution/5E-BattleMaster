@@ -96,7 +96,7 @@ var CombatHandler = CombatHandler || (function() {
             stringToSend += buttonArray[i];
         }
         stringToSend += '</div>';
-        sendChat('CombatHandler', stringToSend);
+        sendChat('BattleMaster', stringToSend);
     },
 
     promptLocation = function(xToAssign, yToAssign){
@@ -199,7 +199,7 @@ var CombatHandler = CombatHandler || (function() {
         bInCombat = true;
         bIsWaitingOnResponse = false;
         log('Combat Started!');
-        sendChat("Combat Handler", "/w GM Combat Started!")
+        sendChat("BattleMaster", "/w GM Combat Started!")
         /*
         Things this needs to do: 
         Set a combat bool to true
@@ -211,7 +211,7 @@ var CombatHandler = CombatHandler || (function() {
         bInCombat = false;
         bIsWaitingOnResponse = false;
         log('Combat stopped!');
-        sendChat("Combat Handler", "/w GM Combat Stopped!")
+        sendChat("BattleMaster", "/w GM Combat Stopped!")
     },
     
     TurnChange = function(){
@@ -237,7 +237,7 @@ var CombatHandler = CombatHandler || (function() {
         ResetUnspecificTurnValues();
         log('It\'s now ' + currentTurnCharacter.get('name') + '\'s turn!' );
         log('This character is controlled by player ' + currentTurnPlayer.get('displayname'))
-        sendChat('Combat Handler','/w "'+ currentTurnPlayer.get('displayname') + '" It\'s your turn as ' + currentTurnCharacter.get('name'));
+        sendChat('BattleMaster','/w "'+ currentTurnPlayer.get('displayname') + '" It\'s your turn as ' + currentTurnCharacter.get('name'));
         promptButtonArray("Select an action", generateTurnOptions(),generateTurnOptionCommands());
     },
     
@@ -272,7 +272,7 @@ var CombatHandler = CombatHandler || (function() {
     WeaponAttack = function(targetToken){
         if(targetToken != undefined){
             log('Weapon attacking at ' + targetToken.get('name'));
-            sendChat("Combat Handler", '/w "' + currentPlayerDisplayName + '" ' + "Now attempting to attack " + targetToken.get('name') + ". Please roll your weapon attack from your character sheet.");
+            sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" ' + "Now attempting to attack " + targetToken.get('name') + ". Please roll your weapon attack from your character sheet.");
             listRollCallbackFunctions.push(WeaponAttackRollCallback);
             listPlayerIDsWaitingOnRollFrom.push(currentTurnPlayer.id);
             bIsWaitingOnRoll = true;
@@ -280,7 +280,7 @@ var CombatHandler = CombatHandler || (function() {
         }
         else{
             log('Tried to attack with weapon, but no target was selected!');
-            sendChat("Combat Handler", '/w "' + currentPlayerDisplayName + '" No target is selected! Please select a target before you attempt to attack with a weapon!');
+            sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" No target is selected! Please select a target before you attempt to attack with a weapon!');
         }
     },
     
@@ -296,7 +296,7 @@ var CombatHandler = CombatHandler || (function() {
         }
         if(ac <= rollMsg.inlinerolls[0].results.total){
             log("Hit! Enemy AC is " + ac + " and roll result was " + rollMsg.inlinerolls[0].results.total);
-            sendChat("Combat Handler", '/w "' + currentPlayerDisplayName + '" Hit! Applying damage to ' + target.get('name'));
+            sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" Hit! Applying damage to ' + target.get('name'));
             applyDamage(rollMsg.inlinerolls[2].results.total, 'none', target, getObj('character', target.get('represents')));
             if(rollMsg.inlinerolls[3].results.total != 0){
                 applyDamage(rollMsg.inlinerolls[3].results.total, 'none', target, getObj('character', target.get('represents')));
@@ -305,7 +305,7 @@ var CombatHandler = CombatHandler || (function() {
         }
         else{
             log("Miss! Enemy AC is " + ac + " and roll result was " + rollMsg.inlinerolls[0].results.total);
-            sendChat("Combat Handler", '/w "' + currentPlayerDisplayName + '" Miss!');
+            sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" Miss!');
         }
     },
     
@@ -320,7 +320,7 @@ var CombatHandler = CombatHandler || (function() {
     },
     
     AOESpellAttack = function(){
-        sendChat('Combat Handler', '/w "' + currentPlayerDisplayName + '" Roll your AOE spell from your character sheet!');
+        sendChat('BattleMaster', '/w "' + currentPlayerDisplayName + '" Roll your AOE spell from your character sheet!');
         listPlayerIDsWaitingOnRollFrom.push(currentTurnPlayer.id);
         listRollCallbackFunctions.push(AOESpellRollCallback);
         bIsWaitingOnRoll = true;
@@ -373,15 +373,16 @@ var CombatHandler = CombatHandler || (function() {
         else if (direction.toLowerCase().indexOf('right') != -1){
             xMod = 35;
         }
-        _.each(findAllTokensInCone(x + xMod, y + yMod, direction, range), spellEffects());
+        _.each(findAllTokensInCone(x + xMod, y + yMod, direction, range), spellEffects);
     },
 
     spellEffects = function(token){
-        log("Found token " + token.get("name") + "In cone!");
-        var playerID = findWhoIsControlling(getObj('character',token.get('represents'))).id
+        log("Found token " + token.get("name") + " in cone!");
+        var playerID = findWhoIsControlling(getObj('character',token.get('represents')));
+        log("Associated player: " + playerID);
+        sendChat("BattleMaster", '/w "' + getObj('player',playerID).get("displayname") + '" Please roll a ' + currentlyCastingSpellRoll + ' saving throw for ' + token.get("name"));
         listPlayerIDsWaitingOnRollFrom.push(playerID);
-        sendChat("Combat Handler", '/w "' + getObj('player',playerID).get("displayname") + '" Please roll a ' + currentlyCastingSpellRoll + ' saving throw!');
-        listRollCallbackFunctions.push(SavingThrowAgainstDamageRollCallback());
+        listRollCallbackFunctions.push(SavingThrowAgainstDamageRollCallback);
     },
 
     distanceToPixels = function(dist) {
@@ -546,6 +547,7 @@ var CombatHandler = CombatHandler || (function() {
         _.each(listTokensInEncounter, function(token){
             if(tokenIsConstrainedByLines(token, line1XofY, line1YofX, line2XofY, line2YofX, bLine1XNeg, bLine1YNeg, bLine2XNeg, bLine2YNeg, range)){
                 listTokensToReturn.push(token);
+                log(token.get("name") + " is within the cone!");
             }
         });
         return listTokensToReturn;
@@ -564,7 +566,7 @@ var CombatHandler = CombatHandler || (function() {
 
     },
     
-    SavingThrowAgainstDamageRollCallback = function(rollMsg, token){
+    SavingThrowAgainstDamageRollCallback = function(){
         var indexSaveAttr = rollMsg.content.indexOf("{{saveAttr="),
         indexSaveDesc = rollMsg.content.indexOf('}} {{savedesc='),
         indexSaveDc = rollMsg.content.indexOf('{{mod=DC'),
