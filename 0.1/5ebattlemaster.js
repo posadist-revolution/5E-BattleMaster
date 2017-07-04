@@ -339,6 +339,7 @@ var CombatHandler = CombatHandler || (function() {
                 bIsWaitingOnResponse = true;
                 responseCallbackFunction = coneDirectionPromptCallback;
                 range = args[2];
+                log("Spell is a cone!");
                 break;
                 case "line": var direction; promptDirection(direction); break;
                 case "sphere": break;
@@ -346,12 +347,12 @@ var CombatHandler = CombatHandler || (function() {
                 case "cylinder": break;
             }
         }
-        log("Attempting AOE Spell!");
-        log("Target: " + rangeString.toLowerCase());
     },
 
     distanceBetween = function(originX, originY, finalX, finalY){
-        return Math.sqrt((originX - finalX)^2 + (originY - finalY)^2);
+        var deltaX = originX - finalX,
+        deltaY = originY - finalY
+        return Math.sqrt(Math.pow(deltaX,2) + Math.pow(deltaY,2));
     },
 
     coneDirectionPromptCallback = function(){
@@ -372,10 +373,16 @@ var CombatHandler = CombatHandler || (function() {
         }
         _.each(findAllTokensInCone(x + xMod, y + yMod, direction, range), function(token){
             log("Found token " + token.get("name") + "In cone!");
-            listPlayerIDsWaitingOnRollFrom.push(token.findWhoIsControlling().id);
+            listPlayerIDsWaitingOnRollFrom.push(findWhoIsControlling(getObj('character',token.get('represents'))).id);
             listRollCallbackFunctions.push(SavingThrowAgainstDamageRollCallback());
         });
     },
+
+    distanceToPixels = function(dist) {
+	    var PIX_PER_UNIT = 70;
+	    var page = getObj('page', Campaign().get('playerpageid'));
+	    return PIX_PER_UNIT * (dist/page.get('scale_number'));
+    },  
     
     findAllTokensInCone = function(originX, originY, direction, range){
         var listTokensToReturn = [],
@@ -389,7 +396,7 @@ var CombatHandler = CombatHandler || (function() {
             bValueToReturn = bValueToReturn && (bLine1YNeg && tokenY <= line1YofX(tokenX) || (!bLine1YNeg) && tokenY >= line1YofX(tokenX));
             bValueToReturn = bValueToReturn && (bLine2XNeg && tokenX <= line2XofY(tokenY) || (!bLine2XNeg) && tokenX >= line2XofY(tokenY));
             bValueToReturn = bValueToReturn && (bLine2YNeg && tokenY <= line2YofX(tokenX) || (!bLine2YNeg) && tokenY >= line2YofX(tokenX));
-            bValueToReturn = bValueToReturn && (distanceBetween(originX, originY, tokenX, tokenY) <= range)
+            bValueToReturn = bValueToReturn && (distanceBetween(originX, originY, tokenX, tokenY) <= distanceToPixels(range));
             return bValueToReturn;
         }
         switch (direction){
@@ -403,10 +410,10 @@ var CombatHandler = CombatHandler || (function() {
                     return -((x - originX)*2) + originY;
                 }
                 line1XofY = function(y){
-                    return -((y - originY)/2) + originX;
+                    return ((y - originY)/2) + originX;
                 }
                 line2XofY= function(y){
-                    return ((y - originY)/2) + originX;
+                    return -((y - originY)/2) + originX;
                 }
             break;
 
@@ -535,7 +542,9 @@ var CombatHandler = CombatHandler || (function() {
                 listTokensToReturn.push(token);
             }
         });
+        return listTokensToReturn;
     },
+    
     findAllTokensInSphere = function(x,y,range){
 
     },
