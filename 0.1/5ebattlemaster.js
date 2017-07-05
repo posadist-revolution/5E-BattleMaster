@@ -9,6 +9,7 @@ var CombatHandler = CombatHandler || (function() {
     direction,
     range,
     listTokensInEncounter = [],
+    listTokensWaitingOnSavingThrowsFrom = [],
     sPreviousAction, sPreviousBonusAction,
     listRollCallbackFunctions = [],
     listPlayerIDsWaitingOnRollFrom = [],
@@ -154,6 +155,8 @@ var CombatHandler = CombatHandler || (function() {
             if(playerIDLocation != -1){
                 listRollCallbackFunctions[playerIDLocation](msg);
             }
+            listPlayerIDsWaitingOnRollFrom.splice(playerIDLocation,1);
+            listRollCallbackFunctions.splice(playerIDLocation,1);
             return;
         }
         args = msg.content.split(/\s+/);//splits the message contents into discrete arguments
@@ -228,13 +231,13 @@ var CombatHandler = CombatHandler || (function() {
 			{return undefined;}
 		if (typeof(turnorder) === 'string') 
 			{turnorder = JSON.parse(turnorder);}
-        _.each(turnorder, function(current){
-            listTokensInEncounter.push(getObj("graphic",current.id));
-        });
         //Reset all the variables for the new turn
         ResetTokenTurnValues(currentTurnToken);
         ResetCharacterTurnValues(currentTurnCharacter);
         ResetUnspecificTurnValues();
+        _.each(turnorder, function(current){
+            listTokensInEncounter.push(getObj("graphic",current.id));
+        });
         log('It\'s now ' + currentTurnCharacter.get('name') + '\'s turn!' );
         log('This character is controlled by player ' + currentTurnPlayer.get('displayname'))
         sendChat('BattleMaster','/w "'+ currentTurnPlayer.get('displayname') + '" It\'s your turn as ' + currentTurnCharacter.get('name'));
@@ -254,10 +257,12 @@ var CombatHandler = CombatHandler || (function() {
     },
     
     ResetUnspecificTurnValues = function(){
+        
         bHasTakenAction = false;
         bHasTakenBonusAction = false;
         sPreviousAction = "";
         sPreviousBonusAction = "";
+        listTokensInEncounter = [];
     },
     
     BuildMovementWalls = function(){
@@ -328,6 +333,8 @@ var CombatHandler = CombatHandler || (function() {
     
     AOESpellRollCallback = function(rollMsg){
         currentlyCastingSpellRoll = rollMsg;
+        log(currentlyCastingSpellRoll.content);
+        log(currentlyCastingSpellRoll.inlinerolls);
         var rangeString = rollMsg.content.slice(rollMsg.content.indexOf("{{range=") + 8, rollMsg.content.indexOf("}} {{damage=")),
         x = currentTurnToken.get('left'), y = currentTurnToken.get('top'),
         args = rangeString.toLowerCase().split(/\s+/);
@@ -377,16 +384,12 @@ var CombatHandler = CombatHandler || (function() {
     },
 
     spellEffects = function(token){
-        log("Found token " + token.get("name") + " in cone!");
         var playerID = findWhoIsControlling(getObj('character',token.get('represents')));
-        log("Associated player: " + playerID);
         var saveAttrIndex = currentlyCastingSpellRoll.content.indexOf("{{saveattr=") + 11, saveDescIndex = currentlyCastingSpellRoll.content.indexOf('}} {{savedesc=');
-        log("First index: " + saveAttrIndex);
-        log("Second index: " + saveDescIndex);
-        log(currentlyCastingSpellRoll.content);
         sendChat("BattleMaster", '/w "' + getObj('player',playerID).get("displayname") + '" Please roll a ' + currentlyCastingSpellRoll.content.slice(saveAttrIndex,saveDescIndex) + ' saving throw for ' + token.get("name"));
         listPlayerIDsWaitingOnRollFrom.push(playerID);
         listRollCallbackFunctions.push(SavingThrowAgainstDamageRollCallback);
+        listTokensWaitingOnSavingThrowsFrom.push(token);
     },
 
     distanceToPixels = function(dist) {
@@ -549,6 +552,7 @@ var CombatHandler = CombatHandler || (function() {
         }
 
         _.each(listTokensInEncounter, function(token){
+            log("Looking for token" + token.get("name"));
             if(tokenIsConstrainedByLines(token, line1XofY, line1YofX, line2XofY, line2YofX, bLine1XNeg, bLine1YNeg, bLine2XNeg, bLine2YNeg, range)){
                 listTokensToReturn.push(token);
                 log(token.get("name") + " is within the cone!");
@@ -573,17 +577,32 @@ var CombatHandler = CombatHandler || (function() {
 
     },
     
-    SavingThrowAgainstDamageRollCallback = function(){
+    SavingThrowAgainstDamageRollCallback = function(msg){
+        var token = listTokensWaitingOnSavingThrowsFrom.shift();
+        sendChat("BattleMaster",'/w "' + currentPlayerDisplayName +'" Recieved roll for ' + token.get("name"));
         var indexSaveAttr = currentlyCastingSpellRoll.content.indexOf("{{saveattr="),
         indexSaveDesc = currentlyCastingSpellRoll.content.indexOf('}} {{savedesc='),
         indexSaveDc = currentlyCastingSpellRoll.content.indexOf('{{mod=DC'),
+        indexDamageType = currentlyCastingSpellRoll.content.indexOf("{{dmg1type="),
         rollAttribute = currentlyCastingSpellRoll.content.slice(indexSaveAttr + 11, indexSaveDesc),
         rollEffectsDesc = currentlyCastingSpellRoll.content.slice(indexSaveDesc + 14, currentlyCastingSpellRoll.content.indexOf('}} {{savedc= $[[')),
-        rollDC = parseInt(currentlyCastingSpellRoll.content.slice(indexSaveDc + 8, currentlyCastingSpellRoll.content.indexOf('}} {{rname=')));
-
+        rollDC = parseInt(currentlyCastingSpellRoll.content.slice(indexSaveDc + 8, currentlyCastingSpellRoll.content.indexOf('}} {{rname='))),
+        rollDmg = currentlyCastingSpellRoll.inlinerolls[2].results.total,
+        rollDmgType = currentlyCastingSpellRoll.content.slice(indexDamageType + 11, currentlyCastingSpellRoll.content.indexOf('  }}'));
+        log("Potential damage: " + rollDmg);
+        log("Damage type: "+ rollDmgType);
+        var savingThrowRoll = msg.inlinerolls[4].results.total;
+        log("Saving throw roll: " + savingThrowRoll);
+        if(savingThrowRoll>=rollDC){
+            //SAVING THROW EFFECTS GO HERE
+        }
+        else{
+            applyDamage(rollDmg, rollDmgType, token, getObj('character', token.get("represents")));
+        }
     },
     
     applyDamage = function(dmgAmt, dmgType, targetToken, targetCharacter){
+        log("Applying damage to " + targetToken.get('name'));
         var immunitiesRaw = targetCharacter.get("npc_immunities"),
         resistancesRaw = targetCharacter.get("npc_resistances"),
         vulnerabilitiesRaw = targetCharacter.get("npc_vulnerabilities");
