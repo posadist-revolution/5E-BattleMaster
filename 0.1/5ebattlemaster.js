@@ -268,6 +268,15 @@ var CombatHandler = CombatHandler || (function() {
     BuildMovementWalls = function(){
         
     },
+
+    universalizeString = function(string){
+        var tempString = string.toLowerCase();
+        tempString.trim();
+        while(tempString.indexOf(' ') != -1){
+            tempString = tempString.slice(0,tempString.indexOf(' ')) + tempString.slice(tempString.indexOf(' ') + 1);
+        }
+        return tempString
+    },
     
     Move = function(){
         BuildMovementWalls();
@@ -585,7 +594,7 @@ var CombatHandler = CombatHandler || (function() {
         indexSaveDc = currentlyCastingSpellRoll.content.indexOf('{{mod=DC'),
         indexDamageType = currentlyCastingSpellRoll.content.indexOf("{{dmg1type="),
         rollAttribute = currentlyCastingSpellRoll.content.slice(indexSaveAttr + 11, indexSaveDesc),
-        rollEffectsDesc = currentlyCastingSpellRoll.content.slice(indexSaveDesc + 14, currentlyCastingSpellRoll.content.indexOf('}} {{savedc= $[[')),
+        rollEffectsDesc = currentlyCastingSpellRoll.content.slice(indexSaveDesc + 14, currentlyCastingSpellRoll.content.indexOf('}} {{savedc')),
         rollDC = parseInt(currentlyCastingSpellRoll.content.slice(indexSaveDc + 8, currentlyCastingSpellRoll.content.indexOf('}} {{rname='))),
         rollDmg = currentlyCastingSpellRoll.inlinerolls[2].results.total,
         rollDmgType = currentlyCastingSpellRoll.content.slice(indexDamageType + 11, currentlyCastingSpellRoll.content.indexOf('  }}'));
@@ -594,7 +603,15 @@ var CombatHandler = CombatHandler || (function() {
         var savingThrowRoll = msg.inlinerolls[4].results.total;
         log("Saving throw roll: " + savingThrowRoll);
         if(savingThrowRoll>=rollDC){
+            log("Succeeded on saving throw roll! Effects: " + universalizeString(rollEffectsDesc));
             //SAVING THROW EFFECTS GO HERE
+            switch(universalizeString(rollEffectsDesc)){
+                case "halfdamage":
+                    applyDamage(rollDmg/2, rollDmgType, token, getObj('character', token.get("represents")));
+                break;
+
+                default: break;
+            }
         }
         else{
             applyDamage(rollDmg, rollDmgType, token, getObj('character', token.get("represents")));
@@ -602,18 +619,18 @@ var CombatHandler = CombatHandler || (function() {
     },
     
     applyDamage = function(dmgAmt, dmgType, targetToken, targetCharacter){
-        log("Applying damage to " + targetToken.get('name'));
+        log("Applying " + dmgAmt +" " +  dmgType + " damage to " + targetToken.get('name'));
         var immunitiesRaw = targetCharacter.get("npc_immunities"),
         resistancesRaw = targetCharacter.get("npc_resistances"),
         vulnerabilitiesRaw = targetCharacter.get("npc_vulnerabilities");
-        if(immunitiesRaw != undefined && immunitiesRaw.toLowerCase().indexOf(dmgType.toLowerCase()) != -1){
+        if(immunitiesRaw != undefined && universalizeString(immunitiesRaw).indexOf(universalizeString(dmgType)) != -1){
             return;
         }
-        else if(vulnerabilitiesRaw != undefined && vulnerabilitiesRaw.toLowerCase().indexOf(dmgType.toLowerCase()) != -1){
+        else if(vulnerabilitiesRaw != undefined && universalizeString(vulnerabilitiesRaw).indexOf(universalizeString(dmgType)) != -1){
             targetToken.set('bar3_value', targetToken.get('bar3_value') - (2*dmgAmt));
             return;
         }
-        else if(resistancesRaw != undefined && resistancesRaw.toLowerCase().indexOf(dmgType.toLowerCase()) != -1){
+        else if(resistancesRaw != undefined && universalizeString(resistancesRaw).indexOf(universalizeString(dmgType)) != -1){
             targetToken.set('bar3_value', targetToken.get('bar3_value') - Math.floor(dmgAmt/2));
             return;
         }
