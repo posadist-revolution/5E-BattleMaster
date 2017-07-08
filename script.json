@@ -3,7 +3,7 @@
     "script":"5ebattlemaster.js",
     "version":"0.1",
     "previousVersions":[],
-    "description":"The 5E BattleMaster script is designed to make combat according to 5th Edition rules an absolute breeze. When combat starts, type \"!combat start\" to begin the encounter. When combat ends, type \"!combat stop\". When it is a player's turn, they will be notified, and they will be presented with options for various actions. Compatible with EasyExperience.",
+    "description":"The 5E BattleMaster script is designed to make combat according to 5th Edition rules an absolute breeze. When combat starts, type \"!combat start\" to begin the encounter. When combat ends, type \"!combat stop\". When it is a player's turn, they will be notified, and they will be presented with options for various actions.",
     "authors":"Ian Hunicke-Smith",
     "roll20userid":"460085",
     "useroptions":[],
