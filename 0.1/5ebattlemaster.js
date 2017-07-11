@@ -397,10 +397,33 @@ var BattleMaster = BattleMaster || (function() {
     DirectSpellRollCallback = function(rollData){
         bIsWaitingOnRoll = (listPlayerIDsWaitingOnRollFrom.length != 0); //Check if we're still waiting on another roll
         if(rollData.bRequiresSavingThrow){
+            currentlyCastingSpellRoll = rollData;
             log("Saving throw spell!");
+            var playerID = findWhoIsControlling(getObj('character',target.get('represents')));
+            sendChat("BattleMaster", '/w "' + getObj('player',playerID).get("displayname") + '" Please roll a ' + rollData.saveType + ' saving throw for ' + target.get("name"));
+            listPlayerIDsWaitingOnRollFrom.push(playerID);
+            listRollCallbackFunctions.push(SavingThrowAgainstDamageRollCallback);
+            listTokensWaitingOnSavingThrowsFrom.push(target);
         }
         else{
-            log("Ranged spell attack!");
+            log("Spell attack!");
+            var ac = getAttrByName(target.get('represents'),'npcd_ac');
+            if(ac === "" || ac === undefined){
+                log('Couldn\'t find npcd_ac, looking for just ac')
+                ac = getAttrByName(target.get('represents'),'ac');
+            }
+            if(ac <= rollData.d20Rolls[0].results.total){
+                log("Hit! Enemy AC is " + ac + " and roll result was " + rollData.d20Rolls[0].results.total);
+                sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" Hit! Applying damage to ' + target.get('name'));
+                applyDamage(rollData.dmgRolls[0].results.total, rollData.dmgTypes[0], target, getObj('character', target.get('represents')));
+                if(rollData.dmgRolls.length > 1 && rollData.dmgRolls[1].results.total != 0){
+                    applyDamage(rollData.dmgRolls[1].results.total, rollData.dmgTypes[1], target, getObj('character', target.get('represents')));
+                }
+            }
+            else{
+                log("Miss! Enemy AC is " + ac + " and roll result was " + rollData.d20Rolls[0].results.total);
+                sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" Miss!');
+            }
         }
     },
     
