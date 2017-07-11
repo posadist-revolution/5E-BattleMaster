@@ -30,6 +30,7 @@ var BattleMaster = BattleMaster || (function() {
     function rollData(rollMsg){
         var inlineData = rollMsg.inlinerolls;
         this.bRequiresSavingThrow = (universalizeString(rollMsg.content).indexOf("saveattr") != -1);
+        this.playerid = rollMsg.playerid;
         this.d20Rolls = [];
         this.dmgRolls = [];
         this.dmgTypes = [];
@@ -202,9 +203,21 @@ var BattleMaster = BattleMaster || (function() {
                     break;
 		            case 'test' : promptButtonArray('gm', ['Option 1','Option 2', 'Option 3']); 
                     break;
-		            case 'weaponattack': WeaponAttack(getObj(msg.selected[0]._type, msg.selected[0]._id)); 
+		            case 'weaponattack': 
+                        if(msg.selected){
+                            WeaponAttack(getObj(msg.selected[0]._type, msg.selected[0]._id));
+                        }
+                        else{
+                            WeaponAttack(undefined);
+                        }
                     break;
-		            case 'directspell': DirectSpellAttack(getObj(msg.selected[0]._type, msg.selected[0]._id)); 
+		            case 'directspell': 
+                        if(msg.selected){
+                            DirectSpellAttack(getObj(msg.selected[0]._type, msg.selected[0]._id)); 
+                        }
+                        else{
+                            DirectSpellAttack(undefined);
+                        }
                     break;
 		            case 'move': 
                     break;
@@ -226,7 +239,14 @@ var BattleMaster = BattleMaster || (function() {
                     break;
                     case 'downright': direction = args[1]; bIsWaitingOnResponse = false; responseCallbackFunction();
                     break;
-                    case 'selectedtoken': selectedTokenCallbackFunction(getObj(msg.selected[0]._type, msg.selected[0]._id)); break;
+                    case 'selectedtoken': 
+                        if(msg.selected){
+                            selectedTokenCallbackFunction(getObj(msg.selected[0]._type, msg.selected[0]._id));
+                        }
+                        else{
+
+                        }
+                    break;
 		            //default: break;
 		        }break;
 		}
@@ -335,7 +355,7 @@ var BattleMaster = BattleMaster || (function() {
     },
     
     WeaponAttackRollCallback = function(rollData){
-        var loc = listPlayerIDsWaitingOnRollFrom.indexOf(rollMsg.playerid); //Find the index of this current roll callback in the list
+        var loc = listPlayerIDsWaitingOnRollFrom.indexOf(rollData.playerid); //Find the index of this current roll callback in the list
         listPlayerIDsWaitingOnRollFrom.splice(loc,1); //Remove index from listPlayerIDsWaitingOnRollFrom
         listRollCallbackFunctions.splice(loc,1); //Remove index from listRollCallbackFunctions
         bIsWaitingOnRoll = (listPlayerIDsWaitingOnRollFrom.length != 0); //Check if we're still waiting on another roll
@@ -345,7 +365,7 @@ var BattleMaster = BattleMaster || (function() {
             ac = getAttrByName(target.get('represents'),'ac');
         }
         if(ac <= rollData.d20Rolls[0].results.total){
-            log("Hit! Enemy AC is " + ac + " and roll result was " + rollMsg.inlinerolls[0].results.total);
+            log("Hit! Enemy AC is " + ac + " and roll result was " + rollData.d20Rolls[0].results.total);
             sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" Hit! Applying damage to ' + target.get('name'));
             applyDamage(rollData.dmgRolls[0].results.total, rollData.dmgTypes[0], target, getObj('character', target.get('represents')));
             if(rollData.dmgRolls.length > 1 && rollData.dmgRolls[1].results.total != 0){
@@ -354,7 +374,7 @@ var BattleMaster = BattleMaster || (function() {
             spawnFx(target.get('left'), target.get('top'), 'glow-blood');
         }
         else{
-            log("Miss! Enemy AC is " + ac + " and roll result was " + rollMsg.inlinerolls[0].results.total);
+            log("Miss! Enemy AC is " + ac + " and roll result was " + rollData.d20Rolls[0].results.total);
             sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" Miss!');
         }
     },
@@ -378,7 +398,7 @@ var BattleMaster = BattleMaster || (function() {
     },
     
     DirectSpellRollCallback = function(rollData){
-        var loc = listPlayerIDsWaitingOnRollFrom.indexOf(rollMsg.playerid); //Find the index of this current roll callback in the list
+        var loc = listPlayerIDsWaitingOnRollFrom.indexOf(rollData.playerid); //Find the index of this current roll callback in the list
         listPlayerIDsWaitingOnRollFrom.splice(loc,1); //Remove index from listPlayerIDsWaitingOnRollFrom
         listRollCallbackFunctions.splice(loc,1); //Remove index from listRollCallbackFunctions
         bIsWaitingOnRoll = (listPlayerIDsWaitingOnRollFrom.length != 0); //Check if we're still waiting on another roll
@@ -398,6 +418,9 @@ var BattleMaster = BattleMaster || (function() {
     },
     
     AOESpellRollCallback = function(rollData){
+        var loc = listPlayerIDsWaitingOnRollFrom.indexOf(rollData.playerid); //Find the index of this current roll callback in the list
+        listPlayerIDsWaitingOnRollFrom.splice(loc,1); //Remove index from listPlayerIDsWaitingOnRollFrom
+        listRollCallbackFunctions.splice(loc,1); //Remove index from listRollCallbackFunctions
         currentlyCastingSpellRoll = rollData;
         var rangeString = rollData.rangeString,
         x = currentTurnToken.get('left'), y = currentTurnToken.get('top'),
