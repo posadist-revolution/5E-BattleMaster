@@ -459,7 +459,9 @@ var BattleMaster = BattleMaster || (function() {
                     responseCallbackFunction = lineDirectionPromptCallback;
                     range = args[2];
                  break;
-                case "sphere": break;
+                case "sphere":
+                    _.each(findAllTokensInSphere(x,y,args[2]), spellEffects)
+                break;
                 case "cube": break;
                 case "cylinder": break;
             }
