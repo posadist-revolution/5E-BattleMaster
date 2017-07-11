@@ -355,9 +355,6 @@ var BattleMaster = BattleMaster || (function() {
     },
     
     WeaponAttackRollCallback = function(rollData){
-        var loc = listPlayerIDsWaitingOnRollFrom.indexOf(rollData.playerid); //Find the index of this current roll callback in the list
-        listPlayerIDsWaitingOnRollFrom.splice(loc,1); //Remove index from listPlayerIDsWaitingOnRollFrom
-        listRollCallbackFunctions.splice(loc,1); //Remove index from listRollCallbackFunctions
         bIsWaitingOnRoll = (listPlayerIDsWaitingOnRollFrom.length != 0); //Check if we're still waiting on another roll
         var ac = getAttrByName(target.get('represents'),'npcd_ac');
         if(ac === "" || ac === undefined){
@@ -398,9 +395,6 @@ var BattleMaster = BattleMaster || (function() {
     },
     
     DirectSpellRollCallback = function(rollData){
-        var loc = listPlayerIDsWaitingOnRollFrom.indexOf(rollData.playerid); //Find the index of this current roll callback in the list
-        listPlayerIDsWaitingOnRollFrom.splice(loc,1); //Remove index from listPlayerIDsWaitingOnRollFrom
-        listRollCallbackFunctions.splice(loc,1); //Remove index from listRollCallbackFunctions
         bIsWaitingOnRoll = (listPlayerIDsWaitingOnRollFrom.length != 0); //Check if we're still waiting on another roll
         if(rollData.bRequiresSavingThrow){
             log("Saving throw spell!");
@@ -418,9 +412,6 @@ var BattleMaster = BattleMaster || (function() {
     },
     
     AOESpellRollCallback = function(rollData){
-        var loc = listPlayerIDsWaitingOnRollFrom.indexOf(rollData.playerid); //Find the index of this current roll callback in the list
-        listPlayerIDsWaitingOnRollFrom.splice(loc,1); //Remove index from listPlayerIDsWaitingOnRollFrom
-        listRollCallbackFunctions.splice(loc,1); //Remove index from listRollCallbackFunctions
         currentlyCastingSpellRoll = rollData;
         var rangeString = rollData.rangeString,
         x = currentTurnToken.get('left'), y = currentTurnToken.get('top'),
@@ -762,7 +753,22 @@ var BattleMaster = BattleMaster || (function() {
     },
     
     SavingThrowAgainstDamageRollCallback = function(rollData){
-        var token = listTokensWaitingOnSavingThrowsFrom.shift();
+        log("Waiting on rolls for the following tokens: ");
+        _.each(listTokensWaitingOnSavingThrowsFrom, function(token){
+            log(token.get('name'));
+        });
+        for(var i = 0; i < listTokensWaitingOnSavingThrowsFrom.length; i++){
+            if(findWhoIsControlling(getObj('character', listTokensWaitingOnSavingThrowsFrom[i].get('represents'))) === rollData.playerid){
+                var token = listTokensWaitingOnSavingThrowsFrom[i];
+                listTokensWaitingOnSavingThrowsFrom.splice(i,1);
+                log("Found correct token, breaking out of the loop!");
+                break;
+            }
+        }
+        log("Waiting on rolls for the following tokens: ");
+        _.each(listTokensWaitingOnSavingThrowsFrom, function(token){
+            log(token.get('name'));
+        });
         sendChat("BattleMaster",'/w "' + currentPlayerDisplayName +'" Recieved roll for ' + token.get("name"));
         var rollAttribute = currentlyCastingSpellRoll.saveType,
         rollEffectsDesc = currentlyCastingSpellRoll.saveEffects,
