@@ -741,14 +741,14 @@ var BattleMaster = BattleMaster || (function() {
     SavingThrowAgainstDamageRollCallback = function(rollData){
         var token = listTokensWaitingOnSavingThrowsFrom.shift();
         sendChat("BattleMaster",'/w "' + currentPlayerDisplayName +'" Recieved roll for ' + token.get("name"));
-        rollAttribute = currentlyCastingSpellRoll.saveType,
+        var rollAttribute = currentlyCastingSpellRoll.saveType,
         rollEffectsDesc = currentlyCastingSpellRoll.saveEffects,
         rollDC = currentlyCastingSpellRoll.dc,
         rollDmg = currentlyCastingSpellRoll.dmgRolls[0].results.total,
         rollDmgType = currentlyCastingSpellRoll.dmgTypes[0];
         log("Potential damage: " + rollDmg);
         log("Damage type: "+ rollDmgType);
-        var savingThrowRoll = rollData.d20Rolls[0];
+        var savingThrowRoll = rollData.d20Rolls[0].results.total;
         log("Saving throw roll: " + savingThrowRoll);
         if(savingThrowRoll>=rollDC){
             log("Succeeded on saving throw roll! Effects: " + universalizeString(rollEffectsDesc));
