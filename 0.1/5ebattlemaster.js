@@ -32,13 +32,23 @@ var CombatHandler = CombatHandler || (function() {
         this.bRequiresSavingThrow = (universalizeString(rollMsg.content).indexOf("saveattr") != -1);
         this.d20Rolls = [];
         this.dmgRolls = [];
-        this.dc;
-        var r1Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{r1=$[[" + 8), firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{r1=$[[" + 8),"]]")),10),
-        r2Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{r2=$[[" + 8), firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{r2=$[[" + 8),"]]")),10),
-        saveDCIndex = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{savedc=$[[" + 12), firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{savedc=$[[" + 12),"]]")),10);
+        this.dmgTypes = [];
+        this.critRolls = [];
+        this.critTypes = [];
+        var r1Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{r1=$[[") + 8, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{r1=$[[") + 8,"]]")),10),
+        r2Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{r2=$[[") + 8, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{r2=$[[") + 8,"]]")),10),
+        saveDCIndex = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{savedc=$[[") + 12, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{savedc=$[[") + 12,"]]")),10),
+        dmg1Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{dmg1=$[[") + 10, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{dmg1=$[[") + 10,"]]")),10),
+        //dmg2Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{savedc=$[[") + 12, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{savedc=$[[") + 12,"]]")),10),
+        crit1Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{crit1=$[[") + 11, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{crit1=$[[") + 11,"]]")),10),
+        //crit2Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{savedc=$[[") + 12, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{savedc=$[[") + 12,"]]")),10),
+        dmgType1 = rollMsg.content.substring(rollMsg.content.indexOf("dmg1type=") + 9, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("dmg1type=") + 9,"}}"));
+        //dmgType2 = rollMsg.content.substring(rollMsg.content.indexOf("dmg2type=") + 9, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("dmg2type=") + 9,"}}")),
         this.d20Rolls.push(inlineData[r1Index]);
-        this.d20rolls.push(inlineData[r2Index]);
+        this.d20Rolls.push(inlineData[r2Index]);
         this.dc = inlineData[saveDCIndex];
+        this.dmgRolls.push(inlineData[dmg1Index]);//this.dmgRolls.push(inlineData[dmg2Index]);
+        this.dmgTypes.push(dmgType1.trim());
     }
     //**UTILITY SCRIPTS**
     var buildTemplates = function() {
@@ -161,18 +171,15 @@ var CombatHandler = CombatHandler || (function() {
             text='',
             totamount;
         if (msg.type !== 'api' && !bIsWaitingOnRoll && !bIsWaitingOnResponse){
-            log("Rollmsg contents: " + msg.content);
-            var string = "";
-            _.each(msg.inlinerolls,function(roll){
-                string = string + roll.results.total + ", ";
-            });
-            log("Roll data:" + string);
             return;
         }
         if(bIsWaitingOnRoll && msg.inlinerolls != undefined){
             //Call roll result here
             log("We have recieved a roll result!")
             var playerIDLocation = listPlayerIDsWaitingOnRollFrom.indexOf(msg.playerid);
+            var recievedRoll = new rollData(msg);
+            log("Recieved roll damage type 1: " + recievedRoll.dmgTypes[0]);
+            log("Recieved d20 rolls: " + recievedRoll.d20Rolls[0] + ", " + recievedRoll.d20Rolls[1]);
             if(playerIDLocation != -1){
                 listRollCallbackFunctions[playerIDLocation](msg);
             }
