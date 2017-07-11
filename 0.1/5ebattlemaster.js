@@ -1,7 +1,7 @@
 var CombatHandler = CombatHandler || (function() {
     'use strict';
     
-    var bInCombat, bHasTakenAction, bHasTakenBonusAction, bIsWaitingOnRoll, bIsWaitingOnResponse, responseCallbackFunction,
+    var bInCombat, bHasTakenAction, bHasTakenBonusAction, bIsWaitingOnRoll, bIsWaitingOnResponse, responseCallbackFunction, selectedTokenCallbackFunction,
     iMoveSpeedTotal, iMoveSpeedRemaining, iXStart, iYStart, iXCurrent, iYCurrent,
     currentPlayerDisplayName, currentTurnPlayer, currentTurnCharacter, currentTurnToken,
     currentlyCastingSpellRoll,
@@ -27,7 +27,6 @@ var CombatHandler = CombatHandler || (function() {
             }
         },
     templates = {};
-    
     //**UTILITY SCRIPTS**
     var buildTemplates = function() {
         templates.cssProperty =_.template(
@@ -193,6 +192,7 @@ var CombatHandler = CombatHandler || (function() {
                     break;
                     case 'downright': direction = args[1]; bIsWaitingOnResponse = false; responseCallbackFunction();
                     break;
+                    case 'selectedtoken': selectedTokenCallbackFunction(getObj(msg.selected[0]._type, msg.selected[0]._id)); break;
 		            //default: break;
 		        }break;
 		}
@@ -294,7 +294,9 @@ var CombatHandler = CombatHandler || (function() {
         }
         else{
             log('Tried to attack with weapon, but no target was selected!');
-            sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" No target is selected! Please select a target before you attempt to attack with a weapon!');
+            sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" No target is selected! Please select a target!');
+            promptButtonArray("Select a target",["Target Selected"], ["selectedtoken"]);
+            selectedTokenCallbackFunction = WeaponAttack;
         }
     },
     
@@ -325,12 +327,33 @@ var CombatHandler = CombatHandler || (function() {
     
     DirectSpellAttack = function(targetToken){
         if(targetToken != undefined){
-            
+            log('Direct spell attacking at ' + targetToken.get('name'));
+            sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" ' + "Now attempting to attack " + targetToken.get('name') + ". Please roll your spell attack from your character sheet.");
+            listRollCallbackFunctions.push(DirectSpellRollCallback);
+            log("Current turn player: " + currentTurnPlayer);
+            listPlayerIDsWaitingOnRollFrom.push(currentTurnPlayer.id);
+            bIsWaitingOnRoll = true;
+            target = targetToken;
+        }
+        else{
+            log('Tried to attack with direct spell, but no target was selected!');
+            sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" No target is selected! Please select a target!');
+            promptButtonArray("Select a target",["Target Selected"], ["selectedtoken"]);
+            selectedTokenCallbackFunction = DirectSpellAttack;
         }
     },
     
-    DirectSpellRollCallback = function(rollMsg){
-        
+    DirectSpellRollCallback = function(rollData){
+        var loc = listPlayerIDsWaitingOnRollFrom.indexOf(rollMsg.playerid); //Find the index of this current roll callback in the list
+        listPlayerIDsWaitingOnRollFrom.splice(loc,1); //Remove index from listPlayerIDsWaitingOnRollFrom
+        listRollCallbackFunctions.splice(loc,1); //Remove index from listRollCallbackFunctions
+        bIsWaitingOnRoll = (listPlayerIDsWaitingOnRollFrom.length != 0); //Check if we're still waiting on another roll
+        if(universalizeString(rollMsg.content).indexOf("saveattr") != -1){
+            log("Saving throw spell!");
+        }
+        else{
+            log("Ranged spell attack!");
+        }
     },
     
     AOESpellAttack = function(){
@@ -352,14 +375,21 @@ var CombatHandler = CombatHandler || (function() {
         }
         else{
             switch(args[1]){
-                case "cone": promptButtonArray("Select a direction", ["North","South","East","West","Northeast","Northwest","Southeast","Southwest"], 
-                ["up","down","right","left","upright","upleft","downright","downleft"]);
-                bIsWaitingOnResponse = true;
-                responseCallbackFunction = coneDirectionPromptCallback;
-                range = args[2];
-                log("Spell is a cone!");
+                case "cone": 
+                    promptButtonArray("Select a direction", ["North","South","East","West","Northeast","Northwest","Southeast","Southwest"], 
+                    ["up","down","right","left","upright","upleft","downright","downleft"]);
+                    bIsWaitingOnResponse = true;
+                    responseCallbackFunction = coneDirectionPromptCallback;
+                    range = args[2];
+                    log("Spell is a cone!");
                 break;
-                case "line": var direction; promptDirection(direction); break;
+                case "line": 
+                    promptButtonArray("Select a direction", ["North","South","East","West","Northeast","Northwest","Southeast","Southwest"], 
+                    ["up","down","right","left","upright","upleft","downright","downleft"]);
+                    bIsWaitingOnResponse = true;
+                    responseCallbackFunction = lineDirectionPromptCallback;
+                    range = args[2];
+                 break;
                 case "sphere": break;
                 case "cube": break;
                 case "cylinder": break;
@@ -389,7 +419,26 @@ var CombatHandler = CombatHandler || (function() {
         else if (direction.toLowerCase().indexOf('right') != -1){
             xMod = 35;
         }
+        //spawnFxBetweenPoints({x:(x+xMod),y:(y+yMod)},{})
         _.each(findAllTokensInCone(x + xMod, y + yMod, direction, range), spellEffects);
+    },
+
+    lineDirectionPromptCallback = function(){
+        var xMod = 0, yMod = 0,
+        x = currentTurnToken.get("left"), y = currentTurnToken.get("top");
+        if(direction.toLowerCase().indexOf('up') != -1){
+            yMod = -35;
+        }
+        else if(direction.toLowerCase().indexOf('down') != -1){
+            yMod = 35;
+        }
+        if(direction.toLowerCase().indexOf('left') != -1){
+            xMod = -35;
+        }
+        else if (direction.toLowerCase().indexOf('right') != -1){
+            xMod = 35;
+        }
+        _.each(findAllTokensInLine(x+xMod,y+yMod,direction,range), spellEffects);
     },
 
     spellEffects = function(token){
@@ -574,16 +623,88 @@ var CombatHandler = CombatHandler || (function() {
     },
 
     findAllTokensInSphere = function(x,y,range){
+        var listTokensToReturn = [];
+        _.each(listTokensInEncounter, function(token){
+            log("Looking for token" + token.get("name"));
+            if(distanceBetween(x,y,token.get('left'), token.get('top')) <= distanceToPixels(range)){
+                listTokensToReturn.push(token);
+                log(token.get("name") + " is inside the sphere");
+            }
+            else{
+                log(token.get('name') + " is outside the sphere");
+            }
+        });
+        return listTokensToReturn;
 
     },
-    findAllTokensInLine = function(x,y,targetX,targetY,range){
 
+    findAllTokensInLine = function(x,y,direction,range){
+        var listTokensToReturn = [];
+        _.each(listTokensInEncounter, function(token){
+            var tokenX = token.get('left'), tokenY = token.get('top');
+            switch (direction){
+                case "up":
+                    if(tokenX + 20 >= x && tokenX - 20 <= x && tokenY < y && distanceBetween(x,y,tokenX,tokenY) <= distanceToPixels(range)){
+                        listTokensToReturn.push(token);
+                    }
+                break;
+                case 'right':
+                    if(tokenY + 20 >= y && tokenY - 20 <= y && tokenX >= x && distanceBetween(x,y,tokenX,tokenY) <= distanceToPixels(range)){
+                        listTokensToReturn.push(token);
+                    }
+                break;
+                case 'down':
+                    if(tokenX + 20 >= x && tokenX - 20 <= x && tokenY > y && distanceBetween(x,y,tokenX,tokenY) <= distanceToPixels(range)){
+                        listTokensToReturn.push(token);
+                    }
+                break;
+                case 'left':
+                    if(tokenY + 20 >= y && tokenY - 20 <= y && tokenX <= x && distanceBetween(x,y,tokenX,tokenY) <= distanceToPixels(range)){
+                        listTokensToReturn.push(token);
+                    }
+                break;
+                case 'upright':
+                    if(tokenX-x + 20 >= -(tokenY-y) && tokenX-x - 20 <= -(tokenY-y) && tokenX >= x && distanceBetween(x,y,tokenX,tokenY) <= distanceToPixels(range)){
+                        listTokensToReturn.push(token);
+                    }
+                break;
+                case 'downright':
+                    if(tokenX-x + 20 >= tokenY-y && tokenX-x - 20 <= tokenY-y && tokenX >= x && distanceBetween(x,y,tokenX,tokenY) <= distanceToPixels(range)){
+                        listTokensToReturn.push(token);
+                    }
+                break;
+                case 'downleft':
+                    if(tokenX-x + 20 >= tokenY-y && tokenX-x - 20 <= tokenY-y && tokenX <= x && distanceBetween(x,y,tokenX,tokenY) <= distanceToPixels(range)){
+                        listTokensToReturn.push(token);
+                    }
+                break;
+                case 'upleft':
+                    if(tokenX-x + 20 >= -(tokenY-y) && tokenX-x - 20 <= -(tokenY-y) && tokenX <= x && distanceBetween(x,y,tokenX,tokenY) <= distanceToPixels(range)){
+                        listTokensToReturn.push(token);
+                    }
+                break;
+            }
+        });
+        return listTokensToReturn;
     },
+
     findAllTokensInCube = function(x,y,range){
 
     },
-    findAllTokensInCylinder = function(x,y,range,height){
 
+    findAllTokensInCylinder = function(x,y,range,height){
+        var listTokensToReturn = [];
+        _.each(listTokensInEncounter, function(token){
+            log("Looking for token" + token.get("name"));
+            if(distanceBetween(x,y,token.get('left'), token.get('top')) <= distanceToPixels(range)){
+                listTokensToReturn.push(token);
+                log(token.get("name") + " is inside the sphere");
+            }
+            else{
+                log(token.get('name') + " is outside the sphere");
+            }
+        });
+        return listTokensToReturn;
     },
     
     SavingThrowAgainstDamageRollCallback = function(msg){
