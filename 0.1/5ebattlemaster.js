@@ -27,6 +27,12 @@ var CombatHandler = CombatHandler || (function() {
             }
         },
     templates = {};
+    function rollData(rollMsg){
+        this.bRequiresSavingThrow = (universalizeString(rollMsg.content).indexOf("saveattr") != -1);
+        this.d20Rolls = [];
+        this.dmgRolls = [];
+        this.dc = [];
+    }
     //**UTILITY SCRIPTS**
     var buildTemplates = function() {
         templates.cssProperty =_.template(
