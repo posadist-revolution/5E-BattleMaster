@@ -1,4 +1,4 @@
-var CombatHandler = CombatHandler || (function() {
+var BattleMaster = BattleMaster || (function() {
     'use strict';
     
     var bInCombat, bHasTakenAction, bHasTakenBonusAction, bIsWaitingOnRoll, bIsWaitingOnResponse, responseCallbackFunction, selectedTokenCallbackFunction,
@@ -475,8 +475,7 @@ var CombatHandler = CombatHandler || (function() {
 
     spellEffects = function(token){
         var playerID = findWhoIsControlling(getObj('character',token.get('represents')));
-        var saveAttrIndex = currentlyCastingSpellRoll.content.indexOf("{{saveattr=") + 11, saveDescIndex = currentlyCastingSpellRoll.content.indexOf('}} {{savedesc=');
-        sendChat("BattleMaster", '/w "' + getObj('player',playerID).get("displayname") + '" Please roll a ' + currentlyCastingSpellRoll.content.slice(saveAttrIndex,saveDescIndex) + ' saving throw for ' + token.get("name"));
+        sendChat("BattleMaster", '/w "' + getObj('player',playerID).get("displayname") + '" Please roll a ' + currentlyCastingSpellRoll.saveType + ' saving throw for ' + token.get("name"));
         listPlayerIDsWaitingOnRollFrom.push(playerID);
         listRollCallbackFunctions.push(SavingThrowAgainstDamageRollCallback);
         listTokensWaitingOnSavingThrowsFrom.push(token);
@@ -827,5 +826,5 @@ var CombatHandler = CombatHandler || (function() {
 on('ready',function(){
     'use strict';
     
-    CombatHandler.RegisterEventHandlers();
+    BattleMaster.RegisterEventHandlers();
 })
