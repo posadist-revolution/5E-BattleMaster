@@ -28,10 +28,17 @@ var CombatHandler = CombatHandler || (function() {
         },
     templates = {};
     function rollData(rollMsg){
+        var inlineData = rollMsg.inlinerolls;
         this.bRequiresSavingThrow = (universalizeString(rollMsg.content).indexOf("saveattr") != -1);
         this.d20Rolls = [];
         this.dmgRolls = [];
-        this.dc = [];
+        this.dc;
+        var r1Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{r1=$[[" + 8), firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{r1=$[[" + 8),"]]")),10),
+        r2Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{r2=$[[" + 8), firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{r2=$[[" + 8),"]]")),10),
+        saveDCIndex = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{savedc=$[[" + 12), firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{savedc=$[[" + 12),"]]")),10);
+        this.d20Rolls.push(inlineData[r1Index]);
+        this.d20rolls.push(inlineData[r2Index]);
+        this.dc = inlineData[saveDCIndex];
     }
     //**UTILITY SCRIPTS**
     var buildTemplates = function() {
@@ -59,6 +66,9 @@ var CombatHandler = CombatHandler || (function() {
                 'css: _.defaults(css,defaults.css.button)'+
                 '}) %> href="<%= command %>"><%= label||"Button" %></a>'
         );
+    },
+    firstIndexAfter = function(string, preIndex, search){
+        return (preIndex + string.substring(preIndex).indexOf(search));
     },
     
     /*Makes the API buttons used throughout the script*/
@@ -150,8 +160,14 @@ var CombatHandler = CombatHandler || (function() {
             token,
             text='',
             totamount;
-        if (msg.type !== 'api' && !bIsWaitingOnRoll){
-                return;
+        if (msg.type !== 'api' && !bIsWaitingOnRoll && !bIsWaitingOnResponse){
+            log("Rollmsg contents: " + msg.content);
+            var string = "";
+            _.each(msg.inlinerolls,function(roll){
+                string = string + roll.results.total + ", ";
+            });
+            log("Roll data:" + string);
+            return;
         }
         if(bIsWaitingOnRoll && msg.inlinerolls != undefined){
             //Call roll result here
