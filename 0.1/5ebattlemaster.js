@@ -795,14 +795,15 @@ var BattleMaster = BattleMaster || (function() {
         sendChat("BattleMaster",'/w "' + currentPlayerDisplayName +'" Recieved roll for ' + token.get("name"));
         var rollAttribute = currentlyCastingSpellRoll.saveType,
         rollEffectsDesc = currentlyCastingSpellRoll.saveEffects,
-        rollDC = currentlyCastingSpellRoll.dc,
+        rollDC = currentlyCastingSpellRoll.dc.results.total,
         rollDmg = currentlyCastingSpellRoll.dmgRolls[0].results.total,
         rollDmgType = currentlyCastingSpellRoll.dmgTypes[0];
         log("Potential damage: " + rollDmg);
         log("Damage type: "+ rollDmgType);
         var savingThrowRoll = rollData.d20Rolls[0].results.total;
         log("Saving throw roll: " + savingThrowRoll);
-        if(savingThrowRoll>=rollDC){
+        log("rollDC: " + rollDC);
+        if(savingThrowRoll >= rollDC){
             log("Succeeded on saving throw roll! Effects: " + universalizeString(rollEffectsDesc));
             //SAVING THROW EFFECTS GO HERE
             switch(universalizeString(rollEffectsDesc)){
@@ -828,17 +829,17 @@ var BattleMaster = BattleMaster || (function() {
             return;
         }
         else if(vulnerabilitiesRaw != undefined && universalizeString(vulnerabilitiesRaw).indexOf(universalizeString(dmgType)) != -1){
-            targetToken.set('bar3_value', targetToken.get('bar3_value') - (2*dmgAmt));
+            targetToken.set('bar3_value', targetToken.get('bar3_value') - Math.round(2*dmgAmt));
             //UpdateDeathMarkers(targetToken);
             return;
         }
         else if(resistancesRaw != undefined && universalizeString(resistancesRaw).indexOf(universalizeString(dmgType)) != -1){
-            targetToken.set('bar3_value', targetToken.get('bar3_value') - Math.floor(dmgAmt/2));
+            targetToken.set('bar3_value', targetToken.get('bar3_value') - Math.round(dmgAmt/2));
             //UpdateDeathMarkers(targetToken);
             return;
         }
         else{
-            targetToken.set('bar3_value', targetToken.get('bar3_value') - dmgAmt);
+            targetToken.set('bar3_value', targetToken.get('bar3_value') - Math.round(dmgAmt));
             //UpdateDeathMarkers(targetToken);
             return;
         }
