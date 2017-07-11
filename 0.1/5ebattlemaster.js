@@ -35,6 +35,9 @@ var CombatHandler = CombatHandler || (function() {
         this.dmgTypes = [];
         this.critRolls = [];
         this.critTypes = [];
+        this.rangeString = "";
+        this.saveType = "";
+        this.saveEffects = "";
         var r1Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{r1=$[[") + 8, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{r1=$[[") + 8,"]]")),10),
         r2Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{r2=$[[") + 8, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{r2=$[[") + 8,"]]")),10),
         saveDCIndex = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{savedc=$[[") + 12, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{savedc=$[[") + 12,"]]")),10),
@@ -49,6 +52,9 @@ var CombatHandler = CombatHandler || (function() {
         this.dc = inlineData[saveDCIndex];
         this.dmgRolls.push(inlineData[dmg1Index]);//this.dmgRolls.push(inlineData[dmg2Index]);
         this.dmgTypes.push(dmgType1.trim());
+        this.rangeString = rollMsg.content.substring(rollMsg.content.indexOf("{{range=") + 8, firstIndexAfter(rollMsg.content, rollMsg.content.indexOf("{{range=") + 8, "}}"));
+        this.saveType = rollMsg.content.substring(rollMsg.content.indexOf("{{saveattr=") + 11, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("saveattr=") + 11,"}}"));
+        this.saveEffects = rollMsg.content.substring(rollMsg.content.indexOf("savedesc=") + 9, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("savedesc=") + 9,"}}"));
     }
     //**UTILITY SCRIPTS**
     var buildTemplates = function() {
@@ -77,6 +83,7 @@ var CombatHandler = CombatHandler || (function() {
                 '}) %> href="<%= command %>"><%= label||"Button" %></a>'
         );
     },
+
     firstIndexAfter = function(string, preIndex, search){
         return (preIndex + string.substring(preIndex).indexOf(search));
     },
@@ -178,10 +185,8 @@ var CombatHandler = CombatHandler || (function() {
             log("We have recieved a roll result!")
             var playerIDLocation = listPlayerIDsWaitingOnRollFrom.indexOf(msg.playerid);
             var recievedRoll = new rollData(msg);
-            log("Recieved roll damage type 1: " + recievedRoll.dmgTypes[0]);
-            log("Recieved d20 rolls: " + recievedRoll.d20Rolls[0] + ", " + recievedRoll.d20Rolls[1]);
             if(playerIDLocation != -1){
-                listRollCallbackFunctions[playerIDLocation](msg);
+                listRollCallbackFunctions[playerIDLocation](recievedRoll);
             }
             listPlayerIDsWaitingOnRollFrom.splice(playerIDLocation,1);
             listRollCallbackFunctions.splice(playerIDLocation,1);
@@ -329,7 +334,7 @@ var CombatHandler = CombatHandler || (function() {
         }
     },
     
-    WeaponAttackRollCallback = function(rollMsg){
+    WeaponAttackRollCallback = function(rollData){
         var loc = listPlayerIDsWaitingOnRollFrom.indexOf(rollMsg.playerid); //Find the index of this current roll callback in the list
         listPlayerIDsWaitingOnRollFrom.splice(loc,1); //Remove index from listPlayerIDsWaitingOnRollFrom
         listRollCallbackFunctions.splice(loc,1); //Remove index from listRollCallbackFunctions
@@ -339,12 +344,12 @@ var CombatHandler = CombatHandler || (function() {
             log('Couldn\'t find npcd_ac, looking for just ac')
             ac = getAttrByName(target.get('represents'),'ac');
         }
-        if(ac <= rollMsg.inlinerolls[0].results.total){
+        if(ac <= rollData.d20Rolls[0].results.total){
             log("Hit! Enemy AC is " + ac + " and roll result was " + rollMsg.inlinerolls[0].results.total);
             sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" Hit! Applying damage to ' + target.get('name'));
-            applyDamage(rollMsg.inlinerolls[2].results.total, 'none', target, getObj('character', target.get('represents')));
-            if(rollMsg.inlinerolls[3].results.total != 0){
-                applyDamage(rollMsg.inlinerolls[3].results.total, 'none', target, getObj('character', target.get('represents')));
+            applyDamage(rollData.dmgRolls[0].results.total, rollData.dmgTypes[0], target, getObj('character', target.get('represents')));
+            if(rollData.dmgRolls.length > 1 && rollData.dmgRolls[1].results.total != 0){
+                applyDamage(rollData.dmgRolls[1].results.total, rollData.dmgTypes[1], target, getObj('character', target.get('represents')));
             }
             spawnFx(target.get('left'), target.get('top'), 'glow-blood');
         }
@@ -377,7 +382,7 @@ var CombatHandler = CombatHandler || (function() {
         listPlayerIDsWaitingOnRollFrom.splice(loc,1); //Remove index from listPlayerIDsWaitingOnRollFrom
         listRollCallbackFunctions.splice(loc,1); //Remove index from listRollCallbackFunctions
         bIsWaitingOnRoll = (listPlayerIDsWaitingOnRollFrom.length != 0); //Check if we're still waiting on another roll
-        if(universalizeString(rollMsg.content).indexOf("saveattr") != -1){
+        if(rollData.bRequiresSavingThrow){
             log("Saving throw spell!");
         }
         else{
@@ -392,11 +397,9 @@ var CombatHandler = CombatHandler || (function() {
         bIsWaitingOnRoll = true;
     },
     
-    AOESpellRollCallback = function(rollMsg){
-        currentlyCastingSpellRoll = rollMsg;
-        log(currentlyCastingSpellRoll.content);
-        log(currentlyCastingSpellRoll.inlinerolls);
-        var rangeString = rollMsg.content.slice(rollMsg.content.indexOf("{{range=") + 8, rollMsg.content.indexOf("}} {{damage=")),
+    AOESpellRollCallback = function(rollData){
+        currentlyCastingSpellRoll = rollData;
+        var rangeString = rollData.rangeString,
         x = currentTurnToken.get('left'), y = currentTurnToken.get('top'),
         args = rangeString.toLowerCase().split(/\s+/);
         if(args[0]!= "self"){
@@ -736,21 +739,17 @@ var CombatHandler = CombatHandler || (function() {
         return listTokensToReturn;
     },
     
-    SavingThrowAgainstDamageRollCallback = function(msg){
+    SavingThrowAgainstDamageRollCallback = function(rollData){
         var token = listTokensWaitingOnSavingThrowsFrom.shift();
         sendChat("BattleMaster",'/w "' + currentPlayerDisplayName +'" Recieved roll for ' + token.get("name"));
-        var indexSaveAttr = currentlyCastingSpellRoll.content.indexOf("{{saveattr="),
-        indexSaveDesc = currentlyCastingSpellRoll.content.indexOf('}} {{savedesc='),
-        indexSaveDc = currentlyCastingSpellRoll.content.indexOf('{{mod=DC'),
-        indexDamageType = currentlyCastingSpellRoll.content.indexOf("{{dmg1type="),
-        rollAttribute = currentlyCastingSpellRoll.content.slice(indexSaveAttr + 11, indexSaveDesc),
-        rollEffectsDesc = currentlyCastingSpellRoll.content.slice(indexSaveDesc + 14, currentlyCastingSpellRoll.content.indexOf('}} {{savedc')),
-        rollDC = parseInt(currentlyCastingSpellRoll.content.slice(indexSaveDc + 8, currentlyCastingSpellRoll.content.indexOf('}} {{rname='))),
-        rollDmg = currentlyCastingSpellRoll.inlinerolls[2].results.total,
-        rollDmgType = currentlyCastingSpellRoll.content.slice(indexDamageType + 11, currentlyCastingSpellRoll.content.indexOf('  }}'));
+        rollAttribute = currentlyCastingSpellRoll.saveType,
+        rollEffectsDesc = currentlyCastingSpellRoll.saveEffects,
+        rollDC = currentlyCastingSpellRoll.dc,
+        rollDmg = currentlyCastingSpellRoll.dmgRolls[0].results.total,
+        rollDmgType = currentlyCastingSpellRoll.dmgTypes[0];
         log("Potential damage: " + rollDmg);
         log("Damage type: "+ rollDmgType);
-        var savingThrowRoll = msg.inlinerolls[4].results.total;
+        var savingThrowRoll = rollData.d20Rolls[0];
         log("Saving throw roll: " + savingThrowRoll);
         if(savingThrowRoll>=rollDC){
             log("Succeeded on saving throw roll! Effects: " + universalizeString(rollEffectsDesc));
