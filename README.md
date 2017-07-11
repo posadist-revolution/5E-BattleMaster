@@ -13,8 +13,9 @@ To begin combat, the GM simply needs to type "!combat start". On each player's t
 In order to use AOE spells, you must slightly change the "range" variable of the spell card. The range must be the following: "[distance castable or self] [AOE type] [AOE range]". For example, let's look at "Burning Hands". "Burning Hands" is a centered-on-caster spell that applies its effect in a 15 foot cone. Therefore, the range would be "Self Cone 15".
 
 ## Planned Functionality
-1. Limit player movement based on bar1 as movement speed
-2. Factor in weapon and spell range to attacks
-3. Add FX to combat spells based upon spell damage types and characteristics.
-4. Attempt to implement class-specific combat features for all base 5E classes
-5. Find a better way to get advantage and disadvantage factored into rolls
+1. Add FX to combat spells based upon spell damage types and characteristics.
+2. Improve "understanding" of various rolls and their characteristics.
+3. Factor in weapon and spell range to attacks
+4. Limit player movement based on bar1 as movement speed
+5. Attempt to implement class-specific combat features for all base 5E classes
+6. Find a better way to get advantage and disadvantage factored into rolls
