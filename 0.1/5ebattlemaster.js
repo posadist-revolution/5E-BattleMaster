@@ -368,7 +368,7 @@ var BattleMaster = BattleMaster || (function() {
             if(rollData.dmgRolls.length > 1 && rollData.dmgRolls[1].results.total != 0){
                 applyDamage(rollData.dmgRolls[1].results.total, rollData.dmgTypes[1], target, getObj('character', target.get('represents')));
             }
-            spawnFx(target.get('left'), target.get('top'), 'glow-blood');
+            spawnFx(target.get('left'), target.get('top'), 'glow-blood',getObj('page', Campaign().get('playerpageid')));
         }
         else{
             log("Miss! Enemy AC is " + ac + " and roll result was " + rollData.d20Rolls[0].results.total);
@@ -459,7 +459,10 @@ var BattleMaster = BattleMaster || (function() {
                     responseCallbackFunction = lineDirectionPromptCallback;
                     range = args[2];
                  break;
-                case "sphere":
+                case "sphere": 
+                    var effectType = "burst-"+dmgTypeToFXName(rollData.dmgTypes[0]);
+                    log("Spawning fx: " + effectType);
+                    spawnFx(x,y,effectType,getObj('page', Campaign().get('playerpageid')));
                     _.each(findAllTokensInSphere(x,y,args[2]), spellEffects)
                 break;
                 case "cube": break;
@@ -490,7 +493,10 @@ var BattleMaster = BattleMaster || (function() {
         else if (direction.toLowerCase().indexOf('right') != -1){
             xMod = 35;
         }
-        //spawnFxBetweenPoints({x:(x+xMod),y:(y+yMod)},{})
+        //spawnFxBetweenPoints({x:(x+xMod),y:(y+yMod)},{})        
+        var effectType = "breath-"+dmgTypeToFXName(currentlyCastingSpellRoll.dmgTypes[0]);
+        log("Spawning fx: " + effectType);
+        spawnFxBetweenPoints({x:(x+xMod), y:(y+yMod)},{x:(x+xMod+xMod), y:(y+yMod+yMod)},effectType,getObj('page', Campaign().get('playerpageid')));
         _.each(findAllTokensInCone(x + xMod, y + yMod, direction, range), spellEffects);
     },
 
@@ -508,7 +514,10 @@ var BattleMaster = BattleMaster || (function() {
         }
         else if (direction.toLowerCase().indexOf('right') != -1){
             xMod = 35;
-        }
+        }       
+        var effectType = "beam-"+dmgTypeToFXName(currentlyCastingSpellRoll.dmgTypes[0]);
+        log("Spawning fx: " + effectType);
+        spawnFxBetweenPoints({x:(x+xMod), y:(y+yMod)},{x:(x+xMod+xMod), y:(y+yMod+yMod)},effectType,getObj('page', Campaign().get('playerpageid')));
         _.each(findAllTokensInLine(x+xMod,y+yMod,direction,range), spellEffects);
     },
 
@@ -844,6 +853,21 @@ var BattleMaster = BattleMaster || (function() {
             targetToken.set('bar3_value', targetToken.get('bar3_value') - Math.round(dmgAmt));
             UpdateDeathMarkers(targetToken);
             return;
+        }
+    },
+
+    dmgTypeToFXName = function(dmgType){
+        switch(universalizeString(dmgType)){
+            case "fire": return "fire";
+            case "necrotic": return "death";
+            case "radiant": return "holy";
+            case "force": return "magic";
+            case "cold": return "frost";
+            case "acid": return "slime";
+            case "psychic": return "magic";
+            case "lightning": return "smoke";
+            case "poison": return "slime";
+            case "thunder": return "smoke";
         }
     },
     
