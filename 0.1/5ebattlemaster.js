@@ -137,10 +137,17 @@ var BattleMaster = BattleMaster || (function() {
 
     promptTarget = function(){
         reticleTokenId = createObj("graphic", {
-            controlledby: currentTurnPlayer.id,
-            left: currentTurnToken.get('left'),
-            top: currentTurnToken.get('top') - distanceToPixels(5),
-        })._id;
+            controlledby: (currentTurnPlayer.id),
+            _pageid: Campaign().get('playerpageid'),
+            left: (currentTurnToken.get('left')),
+            top: (currentTurnToken.get('top') - distanceToPixels(5)),
+            layer: "objects",
+            imgsrc: "https://s3.amazonaws.com/files.d20.io/images/35946928/hC9eLBaOaso0aa9kldO9Jg/thumb.png?1500001934",
+            width: distanceToPixels(5),
+            height: distanceToPixels(5),
+        }).id;
+        sendPing(currentTurnToken.get('left'), currentTurnToken.get('top')- distanceToPixels(5), null, true);
+        log("Reticle token ID: " + reticleTokenId);
         promptButtonArray("Move the target to where you would like to attack", ["Target selected"], ["selectedTarget"])
     },
     
@@ -178,23 +185,39 @@ var BattleMaster = BattleMaster || (function() {
     
     findTokenAtTarget = function(){
         var reticleToken = getObj("graphic",reticleTokenId);
-        listSelectableGraphics = findObjs({                              
-            _pageid: Campaign().get("playerpageid"),                              
-            _type: "graphic",
-            top: reticleToken.get('top'),
-            left: reticleTokken.get('left'),
-        });
-        reticleToken.remove();
-        if(listSelectableGraphics.length > 1){
-            var listTokenNames = [], listCommandNames = [];
-            for(var i = 0; i<listSelectableGraphics.length; i++){
-                listTokenNames.push(listSelectableGraphics[i].get("name"));
-                listCommandNames.push("tokenfromlist " + i);
+        if(reticleToken){
+            log("Reticle token isn't null!");
+            _.each(JSON.parse(Campaign().get('turnorder')), function(token){
+                token = getObj('graphic', token.id);
+                log("Testing token " + token.id);
+                log("Token coords: (" + token.get('left') + ", " + token.get('top'));
+                log("Reticle coords: (" + reticleToken.get('left') + ", " + reticleToken.get('top'));
+                if(token.get('left') + (token.get('width')/2) >= reticleToken.get('left') && 
+                    token.get('left') - (token.get('width')/2) <= reticleToken.get('left') && 
+                    token.get('top') + (token.get('height')/2) >= reticleToken.get('top') &&
+                    token.get('top') - (token.get('height')/2) <= reticleToken.get('top'))
+                    {
+                        listSelectableGraphics.push(getObj('graphic', token.id))
+                    }
+            });
+            log('List of selectable graphics: ' + listSelectableGraphics);
+            reticleToken.remove();
+            if(listSelectableGraphics.length > 1){
+                var listTokenNames = [], listCommandNames = [];
+                for(var i = 0; i<listSelectableGraphics.length; i++){
+                    listTokenNames.push(listSelectableGraphics[i].get("name"));
+                    listCommandNames.push("tokenfromlist " + i);
+                }
+                log("List of potential targets is more than one long!");
+                promptButtonArray("Which token are you targeting?",listTokenNames,listCommandNames);
             }
-            promptButtonArray("Which token are you targeting?",listTokenNames,listCommandNames)
-        }
-        else if(listSelectableGraphics.length === 1){
-            target = listSelectableGraphics[0];
+            else if(listSelectableGraphics.length === 1){
+                target = listSelectableGraphics[0];
+                log("Target:" + target);
+            }
+            else{
+                log("List of potential targets is null!");
+            }
         }
         else{
 
@@ -235,9 +258,13 @@ var BattleMaster = BattleMaster || (function() {
                     break;
 		            case 'test' : promptButtonArray('gm', ['Option 1','Option 2', 'Option 3']); 
                     break;
-		            case 'weaponattack': WeaponAttack(findTokenAtTarget());
+                    case 'weaponattack': 
+                                promptTarget();
+                                selectedTokenCallbackFunction = WeaponAttack;
                     break;
-		            case 'directspell': DirectSpellAttack(findTokenAtTarget()); 
+                    case 'directspell': 
+                                promptTarget();
+                                selectedTokenCallbackFunction = DirectSpellAttack; 
                     break;
 		            case 'move': 
                     break;
@@ -330,7 +357,7 @@ var BattleMaster = BattleMaster || (function() {
     },
     
     ResetUnspecificTurnValues = function(){
-        
+        listSelectableGraphics = [];
         bHasTakenAction = false;
         bHasTakenBonusAction = false;
         sPreviousAction = "";
