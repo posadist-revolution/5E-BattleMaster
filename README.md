@@ -19,3 +19,8 @@ In order to use AOE spells, you must slightly change the "range" variable of the
 4. Limit player movement based on bar1 as movement speed
 5. Attempt to implement class-specific combat features for all base 5E classes
 6. Find a better way to get advantage and disadvantage factored into rolls
+
+
+# Changelog
+
+## V0.2
