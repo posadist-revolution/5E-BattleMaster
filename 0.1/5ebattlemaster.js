@@ -6,6 +6,7 @@ var BattleMaster = BattleMaster || (function() {
     currentPlayerDisplayName, currentTurnPlayer, currentTurnCharacter, currentTurnToken,
     currentlyCastingSpellRoll,
     target,
+    reticleTokenId,
     direction,
     range,
     listTokensInEncounter = [],
@@ -13,6 +14,7 @@ var BattleMaster = BattleMaster || (function() {
     sPreviousAction, sPreviousBonusAction,
     listRollCallbackFunctions = [],
     listPlayerIDsWaitingOnRollFrom = [],
+    listSelectableGraphics = [],
     defaults = {
             css: {
                 button: {
@@ -133,8 +135,20 @@ var BattleMaster = BattleMaster || (function() {
         sendChat('BattleMaster', stringToSend);
     },
 
-    promptLocation = function(xToAssign, yToAssign){
-        
+    promptTarget = function(){
+        reticleTokenId = createObj("graphic", {
+            controlledby: (currentTurnPlayer.id),
+            _pageid: Campaign().get('playerpageid'),
+            left: (currentTurnToken.get('left')),
+            top: (currentTurnToken.get('top') - distanceToPixels(5)),
+            layer: "objects",
+            imgsrc: "https://s3.amazonaws.com/files.d20.io/images/35946928/hC9eLBaOaso0aa9kldO9Jg/thumb.png?1500001934",
+            width: distanceToPixels(5),
+            height: distanceToPixels(5),
+        }).id;
+        sendPing(currentTurnToken.get('left'), currentTurnToken.get('top')- distanceToPixels(5), null, true);
+        log("Reticle token ID: " + reticleTokenId);
+        promptButtonArray("Move the target to where you would like to attack", ["Target selected"], ["selectedTarget"])
     },
     
     findCurrentTurnToken = function(turnorder) {
@@ -167,8 +181,49 @@ var BattleMaster = BattleMaster || (function() {
 	      }
 	  });
 	  return whoIsControlling;
-	};
+	},
     
+    findTokenAtTarget = function(){
+        var reticleToken = getObj("graphic",reticleTokenId);
+        if(reticleToken){
+            log("Reticle token isn't null!");
+            _.each(JSON.parse(Campaign().get('turnorder')), function(token){
+                token = getObj('graphic', token.id);
+                log("Testing token " + token.id);
+                log("Token coords: (" + token.get('left') + ", " + token.get('top'));
+                log("Reticle coords: (" + reticleToken.get('left') + ", " + reticleToken.get('top'));
+                if(token.get('left') + (token.get('width')/2) >= reticleToken.get('left') && 
+                    token.get('left') - (token.get('width')/2) <= reticleToken.get('left') && 
+                    token.get('top') + (token.get('height')/2) >= reticleToken.get('top') &&
+                    token.get('top') - (token.get('height')/2) <= reticleToken.get('top'))
+                    {
+                        listSelectableGraphics.push(getObj('graphic', token.id))
+                    }
+            });
+            log('List of selectable graphics: ' + listSelectableGraphics);
+            reticleToken.remove();
+            if(listSelectableGraphics.length > 1){
+                var listTokenNames = [], listCommandNames = [];
+                for(var i = 0; i<listSelectableGraphics.length; i++){
+                    listTokenNames.push(listSelectableGraphics[i].get("name"));
+                    listCommandNames.push("tokenfromlist " + i);
+                }
+                log("List of potential targets is more than one long!");
+                promptButtonArray("Which token are you targeting?",listTokenNames,listCommandNames);
+            }
+            else if(listSelectableGraphics.length === 1){
+                target = listSelectableGraphics[0];
+                log("Target:" + target);
+            }
+            else{
+                log("List of potential targets is null!");
+            }
+        }
+        else{
+
+        }
+    };
+
     var HandleInput = function(msg_orig){
         var msg = _.clone(msg_orig),
 			args,
@@ -203,21 +258,13 @@ var BattleMaster = BattleMaster || (function() {
                     break;
 		            case 'test' : promptButtonArray('gm', ['Option 1','Option 2', 'Option 3']); 
                     break;
-		            case 'weaponattack': 
-                        if(msg.selected){
-                            WeaponAttack(getObj(msg.selected[0]._type, msg.selected[0]._id));
-                        }
-                        else{
-                            WeaponAttack(undefined);
-                        }
+                    case 'weaponattack': 
+                                promptTarget();
+                                selectedTokenCallbackFunction = WeaponAttack;
                     break;
-		            case 'directspell': 
-                        if(msg.selected){
-                            DirectSpellAttack(getObj(msg.selected[0]._type, msg.selected[0]._id)); 
-                        }
-                        else{
-                            DirectSpellAttack(undefined);
-                        }
+                    case 'directspell': 
+                                promptTarget();
+                                selectedTokenCallbackFunction = DirectSpellAttack; 
                     break;
 		            case 'move': 
                     break;
@@ -239,13 +286,13 @@ var BattleMaster = BattleMaster || (function() {
                     break;
                     case 'downright': direction = args[1]; bIsWaitingOnResponse = false; responseCallbackFunction();
                     break;
-                    case 'selectedtoken': 
-                        if(msg.selected){
-                            selectedTokenCallbackFunction(getObj(msg.selected[0]._type, msg.selected[0]._id));
-                        }
-                        else{
-
-                        }
+                    case 'selectedTarget': 
+                        findTokenAtTarget();
+                        selectedTokenCallbackFunction();
+                    break;
+                    case 'tokenfromlist':
+                        target = listSelectableGraphics[args[2]];
+                        selectedTokenCallbackFunction();
                     break;
 		            //default: break;
 		        }break;
@@ -311,12 +358,13 @@ var BattleMaster = BattleMaster || (function() {
     },
     
     ResetUnspecificTurnValues = function(){
-        
+        listSelectableGraphics = [];
         bHasTakenAction = false;
         bHasTakenBonusAction = false;
         sPreviousAction = "";
         sPreviousBonusAction = "";
         listTokensInEncounter = [];
+        target = undefined;
     },
     
     BuildMovementWalls = function(){
@@ -337,19 +385,18 @@ var BattleMaster = BattleMaster || (function() {
         
     },
     
-    WeaponAttack = function(targetToken){
-        if(targetToken != undefined){
-            log('Weapon attacking at ' + targetToken.get('name'));
-            sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" ' + "Now attempting to attack " + targetToken.get('name') + ". Please roll your weapon attack from your character sheet.");
+    WeaponAttack = function(){
+        if(target != undefined){
+            log('Weapon attacking at ' + target.get('name'));
+            sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" ' + "Now attempting to attack " + target.get('name') + ". Please roll your weapon attack from your character sheet.");
             listRollCallbackFunctions.push(WeaponAttackRollCallback);
             listPlayerIDsWaitingOnRollFrom.push(currentTurnPlayer.id);
             bIsWaitingOnRoll = true;
-            target = targetToken;
         }
         else{
             log('Tried to attack with weapon, but no target was selected!');
-            sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" No target is selected! Please select a target!');
-            promptButtonArray("Select a target",["Target Selected"], ["selectedtoken"]);
+            //sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" No target is selected! Please select a target!');
+            //promptTarget();
             selectedTokenCallbackFunction = WeaponAttack;
         }
     },
@@ -368,7 +415,7 @@ var BattleMaster = BattleMaster || (function() {
             if(rollData.dmgRolls.length > 1 && rollData.dmgRolls[1].results.total != 0){
                 applyDamage(rollData.dmgRolls[1].results.total, rollData.dmgTypes[1], target, getObj('character', target.get('represents')));
             }
-            spawnFx(target.get('left'), target.get('top'), 'glow-blood');
+            spawnFx(target.get('left'), target.get('top'), 'glow-blood',Campaign().get('playerpageid'));
         }
         else{
             log("Miss! Enemy AC is " + ac + " and roll result was " + rollData.d20Rolls[0].results.total);
@@ -376,20 +423,19 @@ var BattleMaster = BattleMaster || (function() {
         }
     },
     
-    DirectSpellAttack = function(targetToken){
-        if(targetToken != undefined){
-            log('Direct spell attacking at ' + targetToken.get('name'));
-            sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" ' + "Now attempting to attack " + targetToken.get('name') + ". Please roll your spell attack from your character sheet.");
+    DirectSpellAttack = function(){
+        if(target != undefined){
+            log('Direct spell attacking at ' + target.get('name'));
+            sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" ' + "Now attempting to attack " + target.get('name') + ". Please roll your spell attack from your character sheet.");
             listRollCallbackFunctions.push(DirectSpellRollCallback);
             log("Current turn player: " + currentTurnPlayer);
             listPlayerIDsWaitingOnRollFrom.push(currentTurnPlayer.id);
             bIsWaitingOnRoll = true;
-            target = targetToken;
         }
         else{
             log('Tried to attack with direct spell, but no target was selected!');
             sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" No target is selected! Please select a target!');
-            promptButtonArray("Select a target",["Target Selected"], ["selectedtoken"]);
+            promptTarget();
             selectedTokenCallbackFunction = DirectSpellAttack;
         }
     },
@@ -459,7 +505,10 @@ var BattleMaster = BattleMaster || (function() {
                     responseCallbackFunction = lineDirectionPromptCallback;
                     range = args[2];
                  break;
-                case "sphere":
+                case "sphere": 
+                    var effectType = "burst-"+dmgTypeToFXName(rollData.dmgTypes[0]);
+                    log("Spawning fx: " + effectType);
+                    spawnFx(x,y,effectType,Campaign().get('playerpageid'));
                     _.each(findAllTokensInSphere(x,y,args[2]), spellEffects)
                 break;
                 case "cube": break;
@@ -490,7 +539,10 @@ var BattleMaster = BattleMaster || (function() {
         else if (direction.toLowerCase().indexOf('right') != -1){
             xMod = 35;
         }
-        //spawnFxBetweenPoints({x:(x+xMod),y:(y+yMod)},{})
+        //spawnFxBetweenPoints({x:(x+xMod),y:(y+yMod)},{})        
+        var effectType = "breath-"+dmgTypeToFXName(currentlyCastingSpellRoll.dmgTypes[0]);
+        log("Spawning fx: " + effectType);
+        spawnFxBetweenPoints({x:(x+xMod), y:(y+yMod)},{x:(x+xMod+xMod), y:(y+yMod+yMod)},effectType,Campaign().get('playerpageid'));
         _.each(findAllTokensInCone(x + xMod, y + yMod, direction, range), spellEffects);
     },
 
@@ -508,7 +560,10 @@ var BattleMaster = BattleMaster || (function() {
         }
         else if (direction.toLowerCase().indexOf('right') != -1){
             xMod = 35;
-        }
+        }       
+        var effectType = "beam-"+dmgTypeToFXName(currentlyCastingSpellRoll.dmgTypes[0]);
+        log("Spawning fx: " + effectType);
+        spawnFxBetweenPoints({x:(x+xMod), y:(y+yMod)},{x:(x+xMod+xMod), y:(y+yMod+yMod)},effectType,getObj('page', Campaign().get('playerpageid')));
         _.each(findAllTokensInLine(x+xMod,y+yMod,direction,range), spellEffects);
     },
 
@@ -844,6 +899,21 @@ var BattleMaster = BattleMaster || (function() {
             targetToken.set('bar3_value', targetToken.get('bar3_value') - Math.round(dmgAmt));
             //UpdateDeathMarkers(targetToken);
             return;
+        }
+    },
+
+    dmgTypeToFXName = function(dmgType){
+        switch(universalizeString(dmgType)){
+            case "fire": return "fire";
+            case "necrotic": return "death";
+            case "radiant": return "holy";
+            case "force": return "magic";
+            case "cold": return "frost";
+            case "acid": return "slime";
+            case "psychic": return "magic";
+            case "lightning": return "smoke";
+            case "poison": return "slime";
+            case "thunder": return "smoke";
         }
     },
     
