@@ -29,6 +29,8 @@ var BattleMaster = BattleMaster || (function() {
             }
         },
     templates = {};
+
+    /* OBJECTS */
     function rollData(rollMsg){
         var inlineData = rollMsg.inlinerolls;
         this.bRequiresSavingThrow = (universalizeString(rollMsg.content).indexOf("saveattr") != -1);
@@ -59,7 +61,16 @@ var BattleMaster = BattleMaster || (function() {
         this.saveType = rollMsg.content.substring(rollMsg.content.indexOf("{{saveattr=") + 11, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("saveattr=") + 11,"}}"));
         this.saveEffects = rollMsg.content.substring(rollMsg.content.indexOf("savedesc=") + 9, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("savedesc=") + 9,"}}"));
     }
-    //**UTILITY SCRIPTS**
+    function location(x,y,z){
+        this.x = x;
+        this.y = y;
+        this.z = z;
+    }
+    var createLocFromToken = function(token){
+        return new location(token.get('left'), token.get('top'), 0)
+    }
+
+    /*UTILITY SCRIPTS*/
     var buildTemplates = function() {
         templates.cssProperty =_.template(
             '<%=name %>: <%=value %>;'
@@ -515,10 +526,11 @@ var BattleMaster = BattleMaster || (function() {
         }
     },
 
-    distanceBetween = function(originX, originY, finalX, finalY){
-        var deltaX = originX - finalX,
-        deltaY = originY - finalY
-        return Math.sqrt(Math.pow(deltaX,2) + Math.pow(deltaY,2));
+    distanceBetween = function(origin, finalPos){
+        var deltaX = origin.x - finalPos.x,
+        deltaY = origin.y - finalPos.y,
+        deltaZ = origin.z - finalPos.z;
+        return Math.sqrt(Math.pow(deltaX,2) + Math.pow(deltaY,2) + Math.pow(deltaZ,2));
     },
 
     coneDirectionPromptCallback = function(){
@@ -579,19 +591,19 @@ var BattleMaster = BattleMaster || (function() {
 	    return PIX_PER_UNIT * (dist/page.get('scale_number'));
     },  
     
-    findAllTokensInCone = function(originX, originY, direction, range){
+    findAllTokensInCone = function(origin, direction, range){
         var listTokensToReturn = [],
         line1YofX, line2YofX,
         line1XofY, line2XofY,
         bLine1XNeg, bLine2XNeg,
         bLine1YNeg, bLine2YNeg;
         var tokenIsConstrainedByLines = function(token, line1XofY, line1YofX, line2XofY, line2YofX, bLine1XNeg, bLine1YNeg, bLine2XNeg, bLine2YNeg, range){
-            var bValueToReturn, tokenX = token.get('left'), tokenY = token.get('top');
-            bValueToReturn = (bLine1XNeg && tokenX <= line1XofY(tokenY) || (!bLine1XNeg) && tokenX >= line1XofY(tokenY));
-            bValueToReturn = bValueToReturn && (bLine1YNeg && tokenY <= line1YofX(tokenX) || (!bLine1YNeg) && tokenY >= line1YofX(tokenX));
-            bValueToReturn = bValueToReturn && (bLine2XNeg && tokenX <= line2XofY(tokenY) || (!bLine2XNeg) && tokenX >= line2XofY(tokenY));
-            bValueToReturn = bValueToReturn && (bLine2YNeg && tokenY <= line2YofX(tokenX) || (!bLine2YNeg) && tokenY >= line2YofX(tokenX));
-            bValueToReturn = bValueToReturn && (distanceBetween(originX, originY, tokenX, tokenY) <= distanceToPixels(range));
+            var bValueToReturn, tokenLoc = createLocFromToken(token);
+            bValueToReturn = (bLine1XNeg && tokenLoc.x <= line1XofY(tokenLoc.y) || (!bLine1XNeg) && tokenLoc.x >= line1XofY(tokenLoc.y));
+            bValueToReturn = bValueToReturn && (bLine1YNeg && tokenLoc.y <= line1YofX(tokenLoc.x) || (!bLine1YNeg) && tokenLoc.y >= line1YofX(tokenLoc.x));
+            bValueToReturn = bValueToReturn && (bLine2XNeg && tokenLoc.x <= line2XofY(tokenLoc.y) || (!bLine2XNeg) && tokenLoc.x >= line2XofY(tokenLoc.y));
+            bValueToReturn = bValueToReturn && (bLine2YNeg && tokenLoc.y <= line2YofX(tokenLoc.x) || (!bLine2YNeg) && tokenLoc.y >= line2YofX(tokenLoc.x));
+            bValueToReturn = bValueToReturn && (distanceBetween(origin, tokenLoc) <= distanceToPixels(range));
             return bValueToReturn;
         }
         switch (direction){
@@ -599,16 +611,16 @@ var BattleMaster = BattleMaster || (function() {
                 bLine1XNeg = false; bLine1YNeg = true;
                 bLine2XNeg = true; bLine2YNeg = true;
                 line1YofX = function(x){
-                    return ((x - originX)*2) + originY;
+                    return ((x - origin.x)*2) + origin.y;
                 }
                 line2YofX = function(x){
-                    return -((x - originX)*2) + originY;
+                    return -((x - origin.x)*2) + origin.y;
                 }
                 line1XofY = function(y){
-                    return ((y - originY)/2) + originX;
+                    return ((y - origin.y)/2) + origin.x;
                 }
                 line2XofY= function(y){
-                    return -((y - originY)/2) + originX;
+                    return -((y - origin.y)/2) + origin.x;
                 }
             break;
 
@@ -616,16 +628,16 @@ var BattleMaster = BattleMaster || (function() {
                 bLine1XNeg = false; bLine1YNeg = false;
                 bLine2XNeg = true; bLine2YNeg = false;
                 line1YofX = function(x){
-                    return -((x - originX)*2) + originY;
+                    return -((x - origin.x)*2) + origin.y;
                 }
                 line2YofX = function(x){
-                    return ((x - originX)*2) + originY;
+                    return ((x - origin.x)*2) + origin.y;
                 }
                 line1XofY = function(y){
-                    return -((y - originY)/2) + originX;
+                    return -((y - origin.y)/2) + origin.x;
                 }
                 line2XofY= function(y){
-                    return ((y - originY)/2) + originX;
+                    return ((y - origin.y)/2) + origin.x;
                 }
             break;
 
@@ -633,16 +645,16 @@ var BattleMaster = BattleMaster || (function() {
                 bLine1XNeg = true; bLine1YNeg = true;
                 bLine2XNeg = true; bLine2YNeg = false;
                 line1YofX = function(x){
-                    return -((x - originX)/2) + originY;
+                    return -((x - origin.x)/2) + origin.y;
                 }
                 line2YofX = function(x){
-                    return ((x - originX)/2) + originY;
+                    return ((x - origin.x)/2) + origin.y;
                 }
                 line1XofY = function(y){
-                    return -((y - originY)*2) + originX;
+                    return -((y - origin.y)*2) + origin.x;
                 }
                 line2XofY= function(y){
-                    return ((y - originY)*2) + originX;
+                    return ((y - origin.y)*2) + origin.x;
                 }
             break;
 
@@ -650,16 +662,16 @@ var BattleMaster = BattleMaster || (function() {
                 bLine1XNeg = false; bLine1YNeg = false;
                 bLine2XNeg = false; bLine2YNeg = true;
                 line1YofX = function(x){
-                    return -((x - originX)/2) + originY;
+                    return -((x - origin.x)/2) + origin.y;
                 }
                 line2YofX = function(x){
-                    return ((x - originX)/2) + originY;
+                    return ((x - origin.x)/2) + origin.y;
                 }
                 line1XofY = function(y){
-                    return -((y - originY)*2) + originX;
+                    return -((y - origin.y)*2) + origin.x;
                 }
                 line2XofY= function(y){
-                    return ((y - originY)*2) + originX;
+                    return ((y - origin.y)*2) + origin.x;
                 }
             break;
 
@@ -667,16 +679,16 @@ var BattleMaster = BattleMaster || (function() {
                 bLine1XNeg = false; bLine1YNeg = true;
                 bLine2XNeg = true; bLine2YNeg = false;
                 line1YofX = function(x){
-                    return ((x - originX)/3) + originY;
+                    return ((x - origin.x)/3) + origin.y;
                 }
                 line2YofX = function(x){
-                    return ((x - originX)*3) + originY;
+                    return ((x - origin.x)*3) + origin.y;
                 }
                 line1XofY = function(y){
-                    return ((y - originY)*3) + originX;
+                    return ((y - origin.y)*3) + origin.x;
                 }
                 line2XofY= function(y){
-                    return ((y - originY)/3) + originX;
+                    return ((y - origin.y)/3) + origin.x;
                 }
             break;
 
@@ -684,16 +696,16 @@ var BattleMaster = BattleMaster || (function() {
                 bLine1XNeg = false; bLine1YNeg = false;
                 bLine2XNeg = true; bLine2YNeg = true;
                 line1YofX = function(x){
-                    return -((x - originX)*3) + originY;
+                    return -((x - origin.x)*3) + origin.y;
                 }
                 line2YofX = function(x){
-                    return -((x - originX)/3) + originY;
+                    return -((x - origin.x)/3) + origin.y;
                 }
                 line1XofY = function(y){
-                    return -((y - originY)/3) + originX;
+                    return -((y - origin.y)/3) + origin.x;
                 }
                 line2XofY= function(y){
-                    return -((y - originY)*3) + originX;
+                    return -((y - origin.y)*3) + origin.x;
                 }
             break;
 
@@ -701,16 +713,16 @@ var BattleMaster = BattleMaster || (function() {
                 bLine1XNeg = true; bLine1YNeg = true;
                 bLine2XNeg = true; bLine2YNeg = false;
                 line1YofX = function(x){
-                    return -((x - originX)*3) + originY;
+                    return -((x - origin.x)*3) + origin.y;
                 }
                 line2YofX = function(x){
-                    return -((x - originX)/3) + originY;
+                    return -((x - origin.x)/3) + origin.y;
                 }
                 line1XofY = function(y){
-                    return -((y - originY)/3) + originX;
+                    return -((y - origin.y)/3) + origin.x;
                 }
                 line2XofY= function(y){
-                    return -((y - originY)*3) + originX;
+                    return -((y - origin.y)*3) + origin.x;
                 }
             break;
 
@@ -718,16 +730,16 @@ var BattleMaster = BattleMaster || (function() {
                 bLine1XNeg = true; bLine1YNeg = false;
                 bLine2XNeg = false; bLine2YNeg = true;
                 line1YofX = function(x){
-                    return ((x - originX)/3) + originY;
+                    return ((x - origin.x)/3) + origin.y;
                 }
                 line2YofX = function(x){
-                    return ((x - originX)*3) + originY;
+                    return ((x - origin.x)*3) + origin.y;
                 }
                 line1XofY = function(y){
-                    return ((y - originY)*3) + originX;
+                    return ((y - origin.y)*3) + origin.x;
                 }
                 line2XofY= function(y){
-                    return ((y - originY)/3) + originX;
+                    return ((y - origin.y)/3) + origin.x;
                 }
             break;
         }
@@ -761,48 +773,48 @@ var BattleMaster = BattleMaster || (function() {
 
     },
 
-    findAllTokensInLine = function(x,y,direction,range){
+    findAllTokensInLine = function(origin,direction,range){
         var listTokensToReturn = [];
         _.each(listTokensInEncounter, function(token){
-            var tokenX = token.get('left'), tokenY = token.get('top');
+            var tokenLoc = createLocFromToken(token);
             switch (direction){
                 case "up":
-                    if(tokenX + 20 >= x && tokenX - 20 <= x && tokenY < y && distanceBetween(x,y,tokenX,tokenY) <= distanceToPixels(range)){
+                    if(tokenLoc.x + 20 >= origin.x && tokenLoc.x - 20 <= origin.x && tokenLoc.y < origin.y && distanceBetween(origin,tokenLoc) <= distanceToPixels(range)){
                         listTokensToReturn.push(token);
                     }
                 break;
                 case 'right':
-                    if(tokenY + 20 >= y && tokenY - 20 <= y && tokenX >= x && distanceBetween(x,y,tokenX,tokenY) <= distanceToPixels(range)){
+                    if(tokenLoc.y + 20 >= origin.y && tokenLoc.y - 20 <= origin.y && tokenLoc.x >= origin.x && distanceBetween(origin,tokenLoc) <= distanceToPixels(range)){
                         listTokensToReturn.push(token);
                     }
                 break;
                 case 'down':
-                    if(tokenX + 20 >= x && tokenX - 20 <= x && tokenY > y && distanceBetween(x,y,tokenX,tokenY) <= distanceToPixels(range)){
+                    if(tokenLoc.x + 20 >= origin.x && tokenLoc.x - 20 <= origin.x && tokenLoc.y > origin.y && distanceBetween(origin,tokenLoc) <= distanceToPixels(range)){
                         listTokensToReturn.push(token);
                     }
                 break;
                 case 'left':
-                    if(tokenY + 20 >= y && tokenY - 20 <= y && tokenX <= x && distanceBetween(x,y,tokenX,tokenY) <= distanceToPixels(range)){
+                    if(tokenLoc.y + 20 >= origin.y && tokenLoc.y - 20 <= origin.y && tokenLoc.x <= origin.x && distanceBetween(origin,tokenLoc) <= distanceToPixels(range)){
                         listTokensToReturn.push(token);
                     }
                 break;
                 case 'upright':
-                    if(tokenX-x + 20 >= -(tokenY-y) && tokenX-x - 20 <= -(tokenY-y) && tokenX >= x && distanceBetween(x,y,tokenX,tokenY) <= distanceToPixels(range)){
+                    if(tokenLoc.x-origin.x + 20 >= -(tokenLoc.y-origin.y) && tokenLoc.x-origin.x - 20 <= -(tokenLoc.y-origin.y) && tokenLoc.x >= origin.x && distanceBetween(origin,tokenLoc) <= distanceToPixels(range)){
                         listTokensToReturn.push(token);
                     }
                 break;
                 case 'downright':
-                    if(tokenX-x + 20 >= tokenY-y && tokenX-x - 20 <= tokenY-y && tokenX >= x && distanceBetween(x,y,tokenX,tokenY) <= distanceToPixels(range)){
+                    if(tokenLoc.x-origin.x + 20 >= tokenLoc.y-origin.y && tokenLoc.x-origin.x - 20 <= tokenLoc.y-origin.y && tokenLoc.x >= origin.x && distanceBetween(origin,tokenLoc) <= distanceToPixels(range)){
                         listTokensToReturn.push(token);
                     }
                 break;
                 case 'downleft':
-                    if(tokenX-x + 20 >= tokenY-y && tokenX-x - 20 <= tokenY-y && tokenX <= x && distanceBetween(x,y,tokenX,tokenY) <= distanceToPixels(range)){
+                    if(tokenLoc.x-origin.x + 20 >= tokenLoc.y-origin.y && tokenLoc.x-origin.x - 20 <= tokenLoc.y-origin.y && tokenLoc.x <= origin.x && distanceBetween(origin,tokenLoc) <= distanceToPixels(range)){
                         listTokensToReturn.push(token);
                     }
                 break;
                 case 'upleft':
-                    if(tokenX-x + 20 >= -(tokenY-y) && tokenX-x - 20 <= -(tokenY-y) && tokenX <= x && distanceBetween(x,y,tokenX,tokenY) <= distanceToPixels(range)){
+                    if(tokenLoc.x-origin.x + 20 >= -(tokenLoc.y-origin.y) && tokenLoc.x-origin.x - 20 <= -(tokenLoc.y-origin.y) && tokenLoc.x <= origin.x && distanceBetween(origin,tokenLoc) <= distanceToPixels(range)){
                         listTokensToReturn.push(token);
                     }
                 break;
