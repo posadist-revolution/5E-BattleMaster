@@ -1,8 +1,8 @@
 var BattleMaster = BattleMaster || (function() {
     'use strict';
     
-    var bInCombat, bHasTakenAction, bHasTakenBonusAction, bIsWaitingOnRoll, bIsWaitingOnResponse, responseCallbackFunction, selectedTokenCallbackFunction,
-    iMoveSpeedTotal, iMoveSpeedRemaining, iXStart, iYStart, iXCurrent, iYCurrent,
+    var bInCombat, bIsWaitingOnRoll, bIsWaitingOnResponse, responseCallbackFunction, selectedTokenCallbackFunction,
+    iXStart, iYStart, iXCurrent, iYCurrent,
     currentPlayerDisplayName, currentTurnPlayer, currentTurnCharacter, currentTurnToken,
     currentlyCastingSpellRoll,
     target,
@@ -69,7 +69,23 @@ var BattleMaster = BattleMaster || (function() {
     var createLocFromToken = function(token){
         return new location(token.get('left'), token.get('top'), 0)
     }
-
+    function tokenWrapper(token){
+        this.token = token;
+        this.associatedCharacter = getObj('character', token.get('represents'));
+        this.bIsMook
+        this.bIsPlayer
+        this.bHasTakenAction = false;
+        this.bHasTakenBonusAction = false;
+        this.bHasTakenReaction = false;
+        this.iMoveSpeedTotal = token.get('bar1_max');
+        this.iMoveSpeedRemaining = token.get('bar1_value');
+        this.name = token.get('name');
+        this.ac = getAttrByName(token.get('represents'),'npcd_ac');
+        if(this.ac === "" || this.ac === undefined){
+            log('Couldn\'t find npcd_ac, looking for just ac')
+            this.ac = getAttrByName(token.get('represents'),'ac');
+        }
+    }
     /*UTILITY SCRIPTS*/
     var buildTemplates = function() {
         templates.cssProperty =_.template(
@@ -150,14 +166,14 @@ var BattleMaster = BattleMaster || (function() {
         reticleTokenId = createObj("graphic", {
             controlledby: (currentTurnPlayer.id),
             _pageid: Campaign().get('playerpageid'),
-            left: (currentTurnToken.get('left')),
-            top: (currentTurnToken.get('top') - distanceToPixels(5)),
+            left: (currentTurnToken.token.get('left')),
+            top: (currentTurnToken.token.get('top') - distanceToPixels(5)),
             layer: "objects",
             imgsrc: "https://s3.amazonaws.com/files.d20.io/images/35946928/hC9eLBaOaso0aa9kldO9Jg/thumb.png?1500001934",
             width: distanceToPixels(5),
             height: distanceToPixels(5),
         }).id;
-        sendPing(currentTurnToken.get('left'), currentTurnToken.get('top')- distanceToPixels(5), null, true);
+        sendPing(currentTurnToken.token.get('left'), currentTurnToken.token.get('top')- distanceToPixels(5), null, true);
         log("Reticle token ID: " + reticleTokenId);
         promptButtonArray("Move the target to where you would like to attack", ["Target selected"], ["selectedTarget"])
     },
@@ -223,7 +239,7 @@ var BattleMaster = BattleMaster || (function() {
                 promptButtonArray("Which token are you targeting?",listTokenNames,listCommandNames);
             }
             else if(listSelectableGraphics.length === 1){
-                target = listSelectableGraphics[0];
+                target = new tokenWrapper(listSelectableGraphics[0]);
                 log("Target:" + target);
             }
             else{
@@ -332,8 +348,8 @@ var BattleMaster = BattleMaster || (function() {
         log('The turn has changed!');
         var turnorder;
         //Find all the information on whose turn it is
-        currentTurnToken = findCurrentTurnToken(Campaign().get('turnorder'));
-        currentTurnCharacter = getObj('character',currentTurnToken.get('represents'));
+        currentTurnToken = new tokenWrapper(findCurrentTurnToken(Campaign().get('turnorder')));
+        currentTurnCharacter = getObj('character',currentTurnToken.token.get('represents'));
         currentTurnPlayer = getObj('player',findWhoIsControlling(currentTurnCharacter));
         currentPlayerDisplayName = currentTurnPlayer.get('displayname');
         if (!turnorder) 
@@ -347,20 +363,20 @@ var BattleMaster = BattleMaster || (function() {
         ResetCharacterTurnValues(currentTurnCharacter);
         ResetUnspecificTurnValues();
         _.each(turnorder, function(current){
-            listTokensInEncounter.push(getObj("graphic",current.id));
+            listTokensInEncounter.push(new tokenWrapper(getObj("graphic",current.id)));
         });
         log('It\'s now ' + currentTurnCharacter.get('name') + '\'s turn!' );
         log('This character is controlled by player ' + currentTurnPlayer.get('displayname'))
-        sendChat('BattleMaster','/w "'+ currentTurnPlayer.get('displayname') + '" It\'s your turn as ' + currentTurnCharacter.get('name'));
+        sendChat('BattleMaster','/w "'+ currentTurnPlayer.get('displayname') + '" It\'s your turn as ' + currentTurnToken.name);
         promptButtonArray("Select an action", generateTurnOptions(),generateTurnOptionCommands());
     },
     
-    ResetTokenTurnValues = function(currentTurnToken){
-        iMoveSpeedTotal = currentTurnToken.get('bar1_max');
-        iMoveSpeedRemaining = iMoveSpeedTotal;
-        currentTurnToken.set('bar1_val', iMoveSpeedRemaining);
-        iXStart = currentTurnToken.get('left');
-        iYStart = currentTurnToken.get('top');
+    ResetTokenTurnValues = function(currentTurnTokenWrapper){
+        currentTurnTokenWrapper.iMoveSpeedTotal = currentTurnToken.token.get('bar1_max');
+        currentTurnTokenWrapper.iMoveSpeedRemaining = currentTurnTokenWrapper.iMoveSpeedTotal;
+        currentTurnTokenWrapper.token.set('bar1_val', currentTurnTokenWrapper.iMoveSpeedRemaining);
+        iXStart = currentTurnTokenWrapper.token.get('left');
+        iYStart = currentTurnTokenWrapper.token.get('top');
     },
     
     ResetCharacterTurnValues = function(currentTurnCharacter){
@@ -369,8 +385,6 @@ var BattleMaster = BattleMaster || (function() {
     
     ResetUnspecificTurnValues = function(){
         listSelectableGraphics = [];
-        bHasTakenAction = false;
-        bHasTakenBonusAction = false;
         sPreviousAction = "";
         sPreviousBonusAction = "";
         listTokensInEncounter = [];
@@ -396,8 +410,8 @@ var BattleMaster = BattleMaster || (function() {
     
     WeaponAttack = function(){
         if(target != undefined){
-            log('Weapon attacking at ' + target.get('name'));
-            sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" ' + "Now attempting to attack " + target.get('name') + ". Please roll your weapon attack from your character sheet.");
+            log('Weapon attacking at ' + target.name);
+            sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" ' + "Now attempting to attack " + target.name + ". Please roll your weapon attack from your character sheet.");
             listRollCallbackFunctions.push(WeaponAttackRollCallback);
             listPlayerIDsWaitingOnRollFrom.push(currentTurnPlayer.id);
             bIsWaitingOnRoll = true;
@@ -412,30 +426,25 @@ var BattleMaster = BattleMaster || (function() {
     
     WeaponAttackRollCallback = function(rollData){
         bIsWaitingOnRoll = (listPlayerIDsWaitingOnRollFrom.length != 0); //Check if we're still waiting on another roll
-        var ac = getAttrByName(target.get('represents'),'npcd_ac');
-        if(ac === "" || ac === undefined){
-            log('Couldn\'t find npcd_ac, looking for just ac')
-            ac = getAttrByName(target.get('represents'),'ac');
-        }
-        if(ac <= rollData.d20Rolls[0].results.total){
-            log("Hit! Enemy AC is " + ac + " and roll result was " + rollData.d20Rolls[0].results.total);
-            sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" Hit! Applying damage to ' + target.get('name'));
-            applyDamage(rollData.dmgRolls[0].results.total, rollData.dmgTypes[0], target, getObj('character', target.get('represents')));
+        if(target.ac <= rollData.d20Rolls[0].results.total){
+            log("Hit! Enemy AC is " + target.ac + " and roll result was " + rollData.d20Rolls[0].results.total);
+            sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" Hit! Applying damage to ' + target.name);
+            applyDamage(rollData.dmgRolls[0].results.total, rollData.dmgTypes[0], target.token, target.associatedCharacter);
             if(rollData.dmgRolls.length > 1 && rollData.dmgRolls[1].results.total != 0){
-                applyDamage(rollData.dmgRolls[1].results.total, rollData.dmgTypes[1], target, getObj('character', target.get('represents')));
+                applyDamage(rollData.dmgRolls[1].results.total, rollData.dmgTypes[1], target.token, target.associatedCharacter);
             }
-            spawnFx(target.get('left'), target.get('top'), 'glow-blood',getObj('page', Campaign().get('playerpageid')));
+            spawnFx(target.token.get('left'), target.token.get('top'), 'glow-blood',getObj('page', Campaign().get('playerpageid')));
         }
         else{
-            log("Miss! Enemy AC is " + ac + " and roll result was " + rollData.d20Rolls[0].results.total);
+            log("Miss! Enemy AC is " + target.ac + " and roll result was " + rollData.d20Rolls[0].results.total);
             sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" Miss!');
         }
     },
     
     DirectSpellAttack = function(){
         if(target != undefined){
-            log('Direct spell attacking at ' + target.get('name'));
-            sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" ' + "Now attempting to attack " + target.get('name') + ". Please roll your spell attack from your character sheet.");
+            log('Direct spell attacking at ' + target.name);
+            sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" ' + "Now attempting to attack " + target.name + ". Please roll your spell attack from your character sheet.");
             listRollCallbackFunctions.push(DirectSpellRollCallback);
             log("Current turn player: " + currentTurnPlayer);
             listPlayerIDsWaitingOnRollFrom.push(currentTurnPlayer.id);
@@ -454,7 +463,7 @@ var BattleMaster = BattleMaster || (function() {
         if(rollData.bRequiresSavingThrow){
             currentlyCastingSpellRoll = rollData;
             log("Saving throw spell!");
-            var playerID = findWhoIsControlling(getObj('character',target.get('represents')));
+            var playerID = findWhoIsControlling(target.associatedCharacter);
             sendChat("BattleMaster", '/w "' + getObj('player',playerID).get("displayname") + '" Please roll a ' + rollData.saveType + ' saving throw for ' + target.get("name"));
             listPlayerIDsWaitingOnRollFrom.push(playerID);
             listRollCallbackFunctions.push(SavingThrowAgainstDamageRollCallback);
@@ -492,7 +501,7 @@ var BattleMaster = BattleMaster || (function() {
     AOESpellRollCallback = function(rollData){
         currentlyCastingSpellRoll = rollData;
         var rangeString = rollData.rangeString,
-        x = currentTurnToken.get('left'), y = currentTurnToken.get('top'),
+        x = currentTurnToken.token.get('left'), y = currentTurnToken.token.get('top'),
         args = rangeString.toLowerCase().split(/\s+/);
         if(args[0]!= "self"){
             log("Not self targeted!");
@@ -518,7 +527,7 @@ var BattleMaster = BattleMaster || (function() {
                     var effectType = "burst-"+dmgTypeToFXName(rollData.dmgTypes[0]);
                     log("Spawning fx: " + effectType);
                     spawnFx(x,y,effectType,getObj('page', Campaign().get('playerpageid')));
-                    _.each(findAllTokensInSphere(x,y,args[2]), spellEffects)
+                    _.each(findAllTokensInSphere(createLocFromToken(currentTurnToken.token),args[2]), spellEffects)
                 break;
                 case "cube": break;
                 case "cylinder": break;
@@ -536,7 +545,7 @@ var BattleMaster = BattleMaster || (function() {
     coneDirectionPromptCallback = function(){
         log("Casting " + direction);
         var xMod = 0, yMod = 0,
-        x = currentTurnToken.get("left"), y = currentTurnToken.get("top");
+        x = currentTurnToken.token.get("left"), y = currentTurnToken.token.get("top");
         if(direction.toLowerCase().indexOf('up') != -1){
             yMod = -35;
         }
@@ -553,12 +562,12 @@ var BattleMaster = BattleMaster || (function() {
         var effectType = "breath-"+dmgTypeToFXName(currentlyCastingSpellRoll.dmgTypes[0]);
         log("Spawning fx: " + effectType);
         spawnFxBetweenPoints({x:(x+xMod), y:(y+yMod)},{x:(x+xMod+xMod), y:(y+yMod+yMod)},effectType,getObj('page', Campaign().get('playerpageid')));
-        _.each(findAllTokensInCone(x + xMod, y + yMod, direction, range), spellEffects);
+        _.each(findAllTokensInCone(new location(x + xMod, y + yMod,0), direction, range), spellEffects);
     },
 
     lineDirectionPromptCallback = function(){
         var xMod = 0, yMod = 0,
-        x = currentTurnToken.get("left"), y = currentTurnToken.get("top");
+        x = currentTurnToken.token.get("left"), y = currentTurnToken.token.get("top");
         if(direction.toLowerCase().indexOf('up') != -1){
             yMod = -35;
         }
@@ -573,13 +582,14 @@ var BattleMaster = BattleMaster || (function() {
         }       
         var effectType = "beam-"+dmgTypeToFXName(currentlyCastingSpellRoll.dmgTypes[0]);
         log("Spawning fx: " + effectType);
-        spawnFxBetweenPoints({x:(x+xMod), y:(y+yMod)},{x:(x+xMod+xMod), y:(y+yMod+yMod)},effectType,getObj('page', Campaign().get('playerpageid')));
+        var startLoc = new location(x+xMod,y+yMod,0), endLoc = new location(x+xMod+xMod, y+yMod+yMod);
+        spawnFxBetweenPoints(startLoc,endLoc,effectType,getObj('page', Campaign().get('playerpageid')));
         _.each(findAllTokensInLine(x+xMod,y+yMod,direction,range), spellEffects);
     },
 
     spellEffects = function(token){
-        var playerID = findWhoIsControlling(getObj('character',token.get('represents')));
-        sendChat("BattleMaster", '/w "' + getObj('player',playerID).get("displayname") + '" Please roll a ' + currentlyCastingSpellRoll.saveType + ' saving throw for ' + token.get("name"));
+        var playerID = findWhoIsControlling(token.associatedCharacter);
+        sendChat("BattleMaster", '/w "' + getObj('player',playerID).get("displayname") + '" Please roll a ' + currentlyCastingSpellRoll.saveType + ' saving throw for ' + token.name);
         listPlayerIDsWaitingOnRollFrom.push(playerID);
         listRollCallbackFunctions.push(SavingThrowAgainstDamageRollCallback);
         listTokensWaitingOnSavingThrowsFrom.push(token);
@@ -745,28 +755,28 @@ var BattleMaster = BattleMaster || (function() {
         }
 
         _.each(listTokensInEncounter, function(token){
-            log("Looking for token" + token.get("name"));
+            log("Looking for token" + token.token.get("name"));
             if(tokenIsConstrainedByLines(token, line1XofY, line1YofX, line2XofY, line2YofX, bLine1XNeg, bLine1YNeg, bLine2XNeg, bLine2YNeg, range)){
                 listTokensToReturn.push(token);
-                log(token.get("name") + " is within the cone!");
+                log(token.token.get("name") + " is within the cone!");
             }
             else{
-                log(token.get('name') + " is outside the cone.");
+                log(token.token.get('name') + " is outside the cone.");
             }
         });
         return listTokensToReturn;
     },
 
-    findAllTokensInSphere = function(x,y,range){
+    findAllTokensInSphere = function(origin,range){
         var listTokensToReturn = [];
         _.each(listTokensInEncounter, function(token){
-            log("Looking for token" + token.get("name"));
-            if(distanceBetween(x,y,token.get('left'), token.get('top')) <= distanceToPixels(range)){
+            log("Looking for token" + token.name);
+            if(distanceBetween(origin,createLocFromToken(token.token)) <= distanceToPixels(range)){
                 listTokensToReturn.push(token);
-                log(token.get("name") + " is inside the sphere");
+                log(token.name + " is inside the sphere");
             }
             else{
-                log(token.get('name') + " is outside the sphere");
+                log(token.name + " is outside the sphere");
             }
         });
         return listTokensToReturn;
@@ -827,16 +837,16 @@ var BattleMaster = BattleMaster || (function() {
 
     },
 
-    findAllTokensInCylinder = function(x,y,range,height){
+    findAllTokensInCylinder = function(origin,range,height){
         var listTokensToReturn = [];
         _.each(listTokensInEncounter, function(token){
-            log("Looking for token" + token.get("name"));
-            if(distanceBetween(x,y,token.get('left'), token.get('top')) <= distanceToPixels(range)){
+            log("Looking for token" + token.token.get("name"));
+            if(distanceBetween(origin,createLocFromToken(token)) <= distanceToPixels(range)){
                 listTokensToReturn.push(token);
-                log(token.get("name") + " is inside the sphere");
+                log(token.token.get("name") + " is inside the sphere");
             }
             else{
-                log(token.get('name') + " is outside the sphere");
+                log(token.token.get('name') + " is outside the sphere");
             }
         });
         return listTokensToReturn;
@@ -845,10 +855,10 @@ var BattleMaster = BattleMaster || (function() {
     SavingThrowAgainstDamageRollCallback = function(rollData){
         log("Waiting on rolls for the following tokens: ");
         _.each(listTokensWaitingOnSavingThrowsFrom, function(token){
-            log(token.get('name'));
+            log(token.token.get('name'));
         });
         for(var i = 0; i < listTokensWaitingOnSavingThrowsFrom.length; i++){
-            if(findWhoIsControlling(getObj('character', listTokensWaitingOnSavingThrowsFrom[i].get('represents'))) === rollData.playerid){
+            if(findWhoIsControlling(listTokensWaitingOnSavingThrowsFrom[i].associatedCharacter) === rollData.playerid){
                 var token = listTokensWaitingOnSavingThrowsFrom[i];
                 listTokensWaitingOnSavingThrowsFrom.splice(i,1);
                 log("Found correct token, breaking out of the loop!");
@@ -857,9 +867,9 @@ var BattleMaster = BattleMaster || (function() {
         }
         log("Waiting on rolls for the following tokens: ");
         _.each(listTokensWaitingOnSavingThrowsFrom, function(token){
-            log(token.get('name'));
+            log(token.token.get('name'));
         });
-        sendChat("BattleMaster",'/w "' + currentPlayerDisplayName +'" Recieved roll for ' + token.get("name"));
+        sendChat("BattleMaster",'/w "' + currentPlayerDisplayName +'" Recieved roll for ' + token.token.get("name"));
         var rollAttribute = currentlyCastingSpellRoll.saveType,
         rollEffectsDesc = currentlyCastingSpellRoll.saveEffects,
         rollDC = currentlyCastingSpellRoll.dc.results.total,
@@ -875,14 +885,14 @@ var BattleMaster = BattleMaster || (function() {
             //SAVING THROW EFFECTS GO HERE
             switch(universalizeString(rollEffectsDesc)){
                 case "halfdamage":
-                    applyDamage(rollDmg/2, rollDmgType, token, getObj('character', token.get("represents")));
+                    applyDamage(rollDmg/2, rollDmgType, token.token, token.associatedCharacter);
                 break;
 
                 default: break;
             }
         }
         else{
-            applyDamage(rollDmg, rollDmgType, token, getObj('character', token.get("represents")));
+            applyDamage(rollDmg, rollDmgType, token.token, token.associatedCharacter);
         }
     },
     
