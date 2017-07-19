@@ -85,6 +85,9 @@ var BattleMaster = BattleMaster || (function() {
             log('Couldn\'t find npcd_ac, looking for just ac')
             this.ac = getAttrByName(token.get('represents'),'ac');
         }
+        this.get = function(attribute){
+            return token.get(attribute);
+        }
     }
     /*UTILITY SCRIPTS*/
     var buildTemplates = function() {
