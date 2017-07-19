@@ -24,3 +24,5 @@ In order to use AOE spells, you must slightly change the "range" variable of the
 # Changelog
 
 ## V0.2
+* Added a bunch of objects to clarify code
+* 
