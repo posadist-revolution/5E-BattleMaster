@@ -901,9 +901,10 @@ var BattleMaster = BattleMaster || (function() {
     
     applyDamage = function(dmgAmt, dmgType, targetToken, targetCharacter){
         log("Applying " + dmgAmt +" " +  dmgType + " damage to " + targetToken.get('name'));
-        var immunitiesRaw = targetCharacter.get("npc_immunities"),
-        resistancesRaw = targetCharacter.get("npc_resistances"),
-        vulnerabilitiesRaw = targetCharacter.get("npc_vulnerabilities");
+        var immunitiesRaw = getAttrByName(targetCharacter.id,"npc_immunities"),
+        resistancesRaw = getAttrByName(targetCharacter.id,"npc_resistances"),
+        vulnerabilitiesRaw = getAttrByName(targetCharacter.id,"npc_vulnerabilities");
+        log(universalizeString(resistancesRaw));
         if(immunitiesRaw != undefined && universalizeString(immunitiesRaw).indexOf(universalizeString(dmgType)) != -1){
             Deathmarkers.UpdateDeathMarkers(targetToken);
             return;
@@ -914,6 +915,7 @@ var BattleMaster = BattleMaster || (function() {
             return;
         }
         else if(resistancesRaw != undefined && universalizeString(resistancesRaw).indexOf(universalizeString(dmgType)) != -1){
+            log(targetCharacter.get('name') + " has resistance to " + dmgType +" damage!")
             targetToken.set('bar3_value', targetToken.get('bar3_value') - Math.round(dmgAmt/2));
             Deathmarkers.UpdateDeathMarkers(targetToken);
             return;
