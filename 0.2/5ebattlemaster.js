@@ -906,23 +906,23 @@ var BattleMaster = BattleMaster || (function() {
         vulnerabilitiesRaw = getAttrByName(targetCharacter.id,"npc_vulnerabilities");
         log(universalizeString(resistancesRaw));
         if(immunitiesRaw != undefined && universalizeString(immunitiesRaw).indexOf(universalizeString(dmgType)) != -1){
-            Deathmarkers.UpdateDeathMarkers(targetToken);
+            //Deathmarkers.UpdateDeathMarkers(targetToken);
             return;
         }
         else if(vulnerabilitiesRaw != undefined && universalizeString(vulnerabilitiesRaw).indexOf(universalizeString(dmgType)) != -1){
             targetToken.set('bar3_value', targetToken.get('bar3_value') - Math.round(2*dmgAmt));
-            deathMarkers.UpdateDeathMarkers(targetToken);
+            //DeathMarkers.UpdateDeathMarkers(targetToken);
             return;
         }
         else if(resistancesRaw != undefined && universalizeString(resistancesRaw).indexOf(universalizeString(dmgType)) != -1){
             log(targetCharacter.get('name') + " has resistance to " + dmgType +" damage!")
             targetToken.set('bar3_value', targetToken.get('bar3_value') - Math.round(dmgAmt/2));
-            Deathmarkers.UpdateDeathMarkers(targetToken);
+            //Deathmarkers.UpdateDeathMarkers(targetToken);
             return;
         }
         else{
             targetToken.set('bar3_value', targetToken.get('bar3_value') - Math.round(dmgAmt));
-            Deathmarkers.UpdateDeathMarkers(targetToken);
+            //Deathmarkers.UpdateDeathMarkers(targetToken);
             return;
         }
     },
