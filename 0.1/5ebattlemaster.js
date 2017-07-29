@@ -292,6 +292,7 @@ var BattleMaster = BattleMaster || (function() {
                     break;
                     case 'tokenfromlist':
                         target = listSelectableGraphics[args[2]];
+                        selectedTokenCallbackFunction();
                     break;
 		            //default: break;
 		        }break;
@@ -363,6 +364,7 @@ var BattleMaster = BattleMaster || (function() {
         sPreviousAction = "";
         sPreviousBonusAction = "";
         listTokensInEncounter = [];
+        target = undefined;
     },
     
     BuildMovementWalls = function(){
@@ -393,8 +395,8 @@ var BattleMaster = BattleMaster || (function() {
         }
         else{
             log('Tried to attack with weapon, but no target was selected!');
-            sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" No target is selected! Please select a target!');
-            promptTarget();
+            //sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" No target is selected! Please select a target!');
+            //promptTarget();
             selectedTokenCallbackFunction = WeaponAttack;
         }
     },
@@ -413,7 +415,7 @@ var BattleMaster = BattleMaster || (function() {
             if(rollData.dmgRolls.length > 1 && rollData.dmgRolls[1].results.total != 0){
                 applyDamage(rollData.dmgRolls[1].results.total, rollData.dmgTypes[1], target, getObj('character', target.get('represents')));
             }
-            spawnFx(target.get('left'), target.get('top'), 'glow-blood',getObj('page', Campaign().get('playerpageid')));
+            spawnFx(target.get('left'), target.get('top'), 'glow-blood',Campaign().get('playerpageid'));
         }
         else{
             log("Miss! Enemy AC is " + ac + " and roll result was " + rollData.d20Rolls[0].results.total);
@@ -506,7 +508,7 @@ var BattleMaster = BattleMaster || (function() {
                 case "sphere": 
                     var effectType = "burst-"+dmgTypeToFXName(rollData.dmgTypes[0]);
                     log("Spawning fx: " + effectType);
-                    spawnFx(x,y,effectType,getObj('page', Campaign().get('playerpageid')));
+                    spawnFx(x,y,effectType,Campaign().get('playerpageid'));
                     _.each(findAllTokensInSphere(x,y,args[2]), spellEffects)
                 break;
                 case "cube": break;
@@ -540,7 +542,7 @@ var BattleMaster = BattleMaster || (function() {
         //spawnFxBetweenPoints({x:(x+xMod),y:(y+yMod)},{})        
         var effectType = "breath-"+dmgTypeToFXName(currentlyCastingSpellRoll.dmgTypes[0]);
         log("Spawning fx: " + effectType);
-        spawnFxBetweenPoints({x:(x+xMod), y:(y+yMod)},{x:(x+xMod+xMod), y:(y+yMod+yMod)},effectType,getObj('page', Campaign().get('playerpageid')));
+        spawnFxBetweenPoints({x:(x+xMod), y:(y+yMod)},{x:(x+xMod+xMod), y:(y+yMod+yMod)},effectType,Campaign().get('playerpageid'));
         _.each(findAllTokensInCone(x + xMod, y + yMod, direction, range), spellEffects);
     },
 
@@ -880,22 +882,22 @@ var BattleMaster = BattleMaster || (function() {
         resistancesRaw = targetCharacter.get("npc_resistances"),
         vulnerabilitiesRaw = targetCharacter.get("npc_vulnerabilities");
         if(immunitiesRaw != undefined && universalizeString(immunitiesRaw).indexOf(universalizeString(dmgType)) != -1){
-            //UpdateDeathMarkers(targetToken);
+            Deathmarkers.UpdateDeathMarkers(targetToken);
             return;
         }
         else if(vulnerabilitiesRaw != undefined && universalizeString(vulnerabilitiesRaw).indexOf(universalizeString(dmgType)) != -1){
             targetToken.set('bar3_value', targetToken.get('bar3_value') - Math.round(2*dmgAmt));
-            //UpdateDeathMarkers(targetToken);
+            Deathmarkers.UpdateDeathMarkers(targetToken);
             return;
         }
         else if(resistancesRaw != undefined && universalizeString(resistancesRaw).indexOf(universalizeString(dmgType)) != -1){
             targetToken.set('bar3_value', targetToken.get('bar3_value') - Math.round(dmgAmt/2));
-            //UpdateDeathMarkers(targetToken);
+            Deathmarkers.UpdateDeathMarkers(targetToken);
             return;
         }
         else{
             targetToken.set('bar3_value', targetToken.get('bar3_value') - Math.round(dmgAmt));
-            //UpdateDeathMarkers(targetToken);
+            Deathmarkers.UpdateDeathMarkers(targetToken);
             return;
         }
     },
