@@ -402,22 +402,27 @@ var BattleMaster = BattleMaster || (function() {
     WeaponAttackRollCallback = function(rollData){
         bIsWaitingOnRoll = (listPlayerIDsWaitingOnRollFrom.length != 0); //Check if we're still waiting on another roll
         var ac = getAttrByName(target.get('represents'),'npcd_ac');
-        if(ac === "" || ac === undefined){
-            log('Couldn\'t find npcd_ac, looking for just ac')
-            ac = getAttrByName(target.get('represents'),'ac');
-        }
-        if(ac <= rollData.d20Rolls[0].results.total){
-            log("Hit! Enemy AC is " + ac + " and roll result was " + rollData.d20Rolls[0].results.total);
-            sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" Hit! Applying damage to ' + target.get('name'));
-            applyDamage(rollData.dmgRolls[0].results.total, rollData.dmgTypes[0], target, getObj('character', target.get('represents')));
-            if(rollData.dmgRolls.length > 1 && rollData.dmgRolls[1].results.total != 0){
-                applyDamage(rollData.dmgRolls[1].results.total, rollData.dmgTypes[1], target, getObj('character', target.get('represents')));
+        if(IsWithinRange(rollData.rangeString,currentTurnToken.get('left'), currentTurnToken.get('top'), target.get('left'), target.get('top'))){
+            if(ac === "" || ac === undefined){
+                log('Couldn\'t find npcd_ac, looking for just ac')
+                ac = getAttrByName(target.get('represents'),'ac');
             }
-            spawnFx(target.get('left'), target.get('top'), 'glow-blood',getObj('page', Campaign().get('playerpageid')));
+            if(ac <= rollData.d20Rolls[0].results.total){
+                log("Hit! Enemy AC is " + ac + " and roll result was " + rollData.d20Rolls[0].results.total);
+                sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" Hit! Applying damage to ' + target.get('name'));
+                applyDamage(rollData.dmgRolls[0].results.total, rollData.dmgTypes[0], target, getObj('character', target.get('represents')));
+                if(rollData.dmgRolls.length > 1 && rollData.dmgRolls[1].results.total != 0){
+                    applyDamage(rollData.dmgRolls[1].results.total, rollData.dmgTypes[1], target, getObj('character', target.get('represents')));
+                }
+                spawnFx(target.get('left'), target.get('top'), 'glow-blood',getObj('page', Campaign().get('playerpageid')));
+            }
+            else{
+                log("Miss! Enemy AC is " + ac + " and roll result was " + rollData.d20Rolls[0].results.total);
+                sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" Miss!');
+            }
         }
         else{
-            log("Miss! Enemy AC is " + ac + " and roll result was " + rollData.d20Rolls[0].results.total);
-            sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" Miss!');
+            sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" Out of range!');
         }
     },
     
@@ -437,37 +442,51 @@ var BattleMaster = BattleMaster || (function() {
             selectedTokenCallbackFunction = DirectSpellAttack;
         }
     },
+
+    IsWithinRange = function(rangeString, originX, originY, targetX, targetY){
+        if(rangeString = ""){
+            return true;
+        }
+        var rangeInt = distanceToPixels(parseInt(rangeString.substring(0,rangeString.indexOf(' '))));
+        var distance = distanceBetween(originX, originY, targetX, targetY);
+        return (rangeInt >= distance);
+    },
     
     DirectSpellRollCallback = function(rollData){
         bIsWaitingOnRoll = (listPlayerIDsWaitingOnRollFrom.length != 0); //Check if we're still waiting on another roll
-        if(rollData.bRequiresSavingThrow){
-            currentlyCastingSpellRoll = rollData;
-            log("Saving throw spell!");
-            var playerID = findWhoIsControlling(getObj('character',target.get('represents')));
-            sendChat("BattleMaster", '/w "' + getObj('player',playerID).get("displayname") + '" Please roll a ' + rollData.saveType + ' saving throw for ' + target.get("name"));
-            listPlayerIDsWaitingOnRollFrom.push(playerID);
-            listRollCallbackFunctions.push(SavingThrowAgainstDamageRollCallback);
-            listTokensWaitingOnSavingThrowsFrom.push(target);
-        }
-        else{
-            log("Spell attack!");
-            var ac = getAttrByName(target.get('represents'),'npcd_ac');
-            if(ac === "" || ac === undefined){
-                log('Couldn\'t find npcd_ac, looking for just ac')
-                ac = getAttrByName(target.get('represents'),'ac');
-            }
-            if(ac <= rollData.d20Rolls[0].results.total){
-                log("Hit! Enemy AC is " + ac + " and roll result was " + rollData.d20Rolls[0].results.total);
-                sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" Hit! Applying damage to ' + target.get('name'));
-                applyDamage(rollData.dmgRolls[0].results.total, rollData.dmgTypes[0], target, getObj('character', target.get('represents')));
-                if(rollData.dmgRolls.length > 1 && rollData.dmgRolls[1].results.total != 0){
-                    applyDamage(rollData.dmgRolls[1].results.total, rollData.dmgTypes[1], target, getObj('character', target.get('represents')));
-                }
+        if(IsWithinRange(rollData.rangeString,currentTurnToken.get('left'), currentTurnToken.get('top'), target.get('left'), target.get('top'))){
+            if(rollData.bRequiresSavingThrow){
+                currentlyCastingSpellRoll = rollData;
+                log("Saving throw spell!");
+                var playerID = findWhoIsControlling(getObj('character',target.get('represents')));
+                sendChat("BattleMaster", '/w "' + getObj('player',playerID).get("displayname") + '" Please roll a ' + rollData.saveType + ' saving throw for ' + target.get("name"));
+                listPlayerIDsWaitingOnRollFrom.push(playerID);
+                listRollCallbackFunctions.push(SavingThrowAgainstDamageRollCallback);
+                listTokensWaitingOnSavingThrowsFrom.push(target);
             }
             else{
-                log("Miss! Enemy AC is " + ac + " and roll result was " + rollData.d20Rolls[0].results.total);
-                sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" Miss!');
+                log("Spell attack!");
+                var ac = getAttrByName(target.get('represents'),'npcd_ac');
+                if(ac === "" || ac === undefined){
+                    log('Couldn\'t find npcd_ac, looking for just ac')
+                    ac = getAttrByName(target.get('represents'),'ac');
+                }
+                if(ac <= rollData.d20Rolls[0].results.total){
+                    log("Hit! Enemy AC is " + ac + " and roll result was " + rollData.d20Rolls[0].results.total);
+                    sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" Hit! Applying damage to ' + target.get('name'));
+                    applyDamage(rollData.dmgRolls[0].results.total, rollData.dmgTypes[0], target, getObj('character', target.get('represents')));
+                    if(rollData.dmgRolls.length > 1 && rollData.dmgRolls[1].results.total != 0){
+                        applyDamage(rollData.dmgRolls[1].results.total, rollData.dmgTypes[1], target, getObj('character', target.get('represents')));
+                    }
+                }
+                else{
+                    log("Miss! Enemy AC is " + ac + " and roll result was " + rollData.d20Rolls[0].results.total);
+                    sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" Miss!');
+                }
             }
+        }
+        else{
+            sendChat("BattleMaster", '/w "' + currentPlayerDisplayName + '" Out of range!');
         }
     },
     
