@@ -25,4 +25,4 @@ In order to use AOE spells, you must slightly change the "range" variable of the
 
 ## V0.2
 * Added a bunch of objects to clarify code
-* 
+* Added compatibility with DeathMarkersPlus to check for dead or bloodied tokens
