@@ -15,7 +15,7 @@ var BattleMaster = BattleMaster || (function() {
     listRollCallbackFunctions = [],
     listPlayerIDsWaitingOnRollFrom = [],
     listSelectableGraphics = [],
-    bDeathMarkersPlusInstalled,
+    bDeathMarkersPlusInstalled, sCharacterSheetType,
     defaults = {
             css: {
                 button: {
@@ -30,11 +30,13 @@ var BattleMaster = BattleMaster || (function() {
             }
         },
     templates = {};
-
+    sCharacterSheetType = "5e Shaped";
     /* OBJECTS */
     function rollData(rollMsg){
+        log("Creating RollData object!");
         var inlineData = rollMsg.inlinerolls;
-        this.bRequiresSavingThrow = (universalizeString(rollMsg.content).indexOf("saveattr") != -1);
+        log("Inline data: " + JSON.stringify(inlineData));
+        log(rollMsg.content);
         this.playerid = rollMsg.playerid;
         this.d20Rolls = [];
         this.dmgRolls = [];
@@ -44,23 +46,55 @@ var BattleMaster = BattleMaster || (function() {
         this.rangeString = "";
         this.saveType = "";
         this.saveEffects = "";
-        var r1Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{r1=$[[") + 8, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{r1=$[[") + 8,"]]")),10),
-        r2Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{r2=$[[") + 8, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{r2=$[[") + 8,"]]")),10),
-        saveDCIndex = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{savedc=$[[") + 12, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{savedc=$[[") + 12,"]]")),10),
-        dmg1Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{dmg1=$[[") + 10, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{dmg1=$[[") + 10,"]]")),10),
-        //dmg2Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{savedc=$[[") + 12, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{savedc=$[[") + 12,"]]")),10),
-        crit1Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{crit1=$[[") + 11, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{crit1=$[[") + 11,"]]")),10),
-        //crit2Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{savedc=$[[") + 12, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{savedc=$[[") + 12,"]]")),10),
-        dmgType1 = rollMsg.content.substring(rollMsg.content.indexOf("dmg1type=") + 9, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("dmg1type=") + 9,"}}"));
-        //dmgType2 = rollMsg.content.substring(rollMsg.content.indexOf("dmg2type=") + 9, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("dmg2type=") + 9,"}}")),
+        switch(sCharacterSheetType){
+            case "5e OGL":
+                this.bRequiresSavingThrow = (universalizeString(rollMsg.content).indexOf("saveattr") != -1);
+                var r1Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{r1=$[[") + 8, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{r1=$[[") + 8,"]]")),10),
+                r2Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{r2=$[[") + 8, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{r2=$[[") + 8,"]]")),10),
+                saveDCIndex = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{savedc=$[[") + 12, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{savedc=$[[") + 12,"]]")),10),
+                dmg1Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{dmg1=$[[") + 10, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{dmg1=$[[") + 10,"]]")),10),
+                //dmg2Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{savedc=$[[") + 12, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{savedc=$[[") + 12,"]]")),10),
+                crit1Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{crit1=$[[") + 11, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{crit1=$[[") + 11,"]]")),10),
+                //crit2Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{savedc=$[[") + 12, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{savedc=$[[") + 12,"]]")),10),
+                dmgType1 = rollMsg.content.substring(rollMsg.content.indexOf("dmg1type=") + 9, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("dmg1type=") + 9,"}}"));
+                //dmgType2 = rollMsg.content.substring(rollMsg.content.indexOf("dmg2type=") + 9, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("dmg2type=") + 9,"}}")),
+                this.rangeString = rollMsg.content.substring(rollMsg.content.indexOf("{{range=") + 8, firstIndexAfter(rollMsg.content, rollMsg.content.indexOf("{{range=") + 8, "}}"));
+                this.saveType = rollMsg.content.substring(rollMsg.content.indexOf("{{saveattr=") + 11, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("saveattr=") + 11,"}}"));
+                this.saveEffects = rollMsg.content.substring(rollMsg.content.indexOf("savedesc=") + 9, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("savedesc=") + 9,"}}"));
+            break;
+            case "5e Shaped":
+                this.bRequiresSavingThrow = (universalizeString(rollMsg.content).indexOf("saving_throw_vs_ability") != -1);
+                if(this.bRequiresSavingThrow){
+                    dmg1Index=parseInt(stringBetween(rollMsg.content,"{{saving_throw_damage=$[[","]]"),10);
+                    dmgType1=stringBetween(rollMsg.content,"{{saving_throw_damage_type=","}}");    
+                    this.saveType = stringBetween(rollMsg.content,"{{saving_throw_vs_ability=","}}");
+                    //this.saveEffects = rollMsg.content.substring(rollMsg.content.indexOf("savedesc=") + 9, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("savedesc=") + 9,"}}"));
+                }
+                else{
+                    var r1Index = parseInt(stringBetween(rollMsg.content,"{{attack1=$[[","]]"),10);
+                    //r2Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{r2=$[[") + 8, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{r2=$[[") + 8,"]]")),10),
+                    this.dc = parseInt(stringBetween(rollMsg.content,"{{saving_throw_dc=$[[","]]"),10);
+                    var dmg1Index = parseInt(stringBetween(rollMsg.content,"{{attack_damage=$[[","]]"),10),
+                    dmg2Index = parseInt(stringBetween(rollMsg.content,"{{attack_second_damage=$[[","]]"),10),
+                    crit1Index = parseInt(stringBetween(rollMsg.content,"{{attack_damage_crit=$[[","]]"),10),
+                    crit2Index = parseInt(stringBetween(rollMsg.content,"{{attack_second_damage_crit=$[[","]]"),10),
+                    dmgType1 = stringBetween(rollMsg.content,"{{attack_damage_type=","}}"),
+                    dmgType2 = stringBetween(rollMsg.content,"{{attack_second_damage_type=","}}");
+                }
+                //this.rangeString = rollMsg.content.substring(rollMsg.content.indexOf("{{range=") + 8, firstIndexAfter(rollMsg.content, rollMsg.content.indexOf("{{range=") + 8, "}}"));
+            break;
+        }
+        log("Roll 1: "+ r1Index + "  Roll 2: " + r2Index);
         this.d20Rolls.push(inlineData[r1Index]);
         this.d20Rolls.push(inlineData[r2Index]);
         this.dc = inlineData[saveDCIndex];
         this.dmgRolls.push(inlineData[dmg1Index]);//this.dmgRolls.push(inlineData[dmg2Index]);
-        this.dmgTypes.push(dmgType1.trim());
-        this.rangeString = rollMsg.content.substring(rollMsg.content.indexOf("{{range=") + 8, firstIndexAfter(rollMsg.content, rollMsg.content.indexOf("{{range=") + 8, "}}"));
-        this.saveType = rollMsg.content.substring(rollMsg.content.indexOf("{{saveattr=") + 11, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("saveattr=") + 11,"}}"));
-        this.saveEffects = rollMsg.content.substring(rollMsg.content.indexOf("savedesc=") + 9, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("savedesc=") + 9,"}}"));
+        this.dmgTypes.push(universalizeString(dmgType1));
+        if(dmg2Index){
+            log("Dmg2Index: " + dmg2Index);
+            this.dmgRolls.push(inlineData[dmg2Index]);
+            this.dmgTypes.push(universalizeString(dmgType2));
+        }
     }
     function location(x,y,z){
         this.x = x;
@@ -120,6 +154,16 @@ var BattleMaster = BattleMaster || (function() {
 
     firstIndexAfter = function(string, preIndex, search){
         return (preIndex + string.substring(preIndex).indexOf(search));
+    },
+
+    stringBetween = function(totalString, startString, endString){
+        var s = totalString.substring(totalString.indexOf(startString) + startString.length, firstIndexAfter(totalString,totalString.indexOf(startString) + startString.length,endString));
+        if(s){
+            return s;
+        }
+        else{
+            return "";
+        }
     },
     
     /*Makes the API buttons used throughout the script*/
@@ -183,6 +227,7 @@ var BattleMaster = BattleMaster || (function() {
     },
     
     findCurrentTurnToken = function(turnorder) {
+        log("Finding current turn token!");
 		if (!turnorder) 
 			{turnorder = Campaign().get('turnorder');}
 		if (!turnorder) 
@@ -190,28 +235,41 @@ var BattleMaster = BattleMaster || (function() {
 		if (typeof(turnorder) === 'string') 
 			{turnorder = JSON.parse(turnorder);}
 		if (turnorder && turnorder.length > 0 && turnorder[0].id !== -1)
-			{return getObj('graphic',turnorder[0].id);}
+            {return getObj('graphic',turnorder[0].id);}
+        log("Found current turn token!");
 		return;
 	},
 	
 	findWhoIsControlling = function(character){
-	  var whoIsControlling;
-	  var listPlayerIDs;
-	  _.each(character.get('controlledby').split(','), function(player){
+        log("Running findWhoIsControlling!");
+	    var whoIsControlling;
+	    _.each(character.get('controlledby').split(','), function(player){
 	      
-	      if(!playerIsGM(player)){
-	          log('Player ID ' + player + ' is controlling this character!');
-	          whoIsControlling = player;
-	      }
-	      else if(whoIsControlling === undefined){
-	          log('Player ID ' + player + ' is a GM, setting them to controlling anyways!');
-	          whoIsControlling = player;
-	      }
-	      else{
-	          log('Player ID ' + player + ' is a GM, not controlling!');
-	      }
-	  });
-	  return whoIsControlling;
+	        if(!playerIsGM(player)){
+	            whoIsControlling = player;
+	        }
+	        else if(whoIsControlling === undefined){
+	            whoIsControlling = player;
+	        }
+        });
+        if(whoIsControlling){
+            log("Found a controlling player!")
+            return whoIsControlling;
+        }
+        else{
+            log("No players in the controlling list!")
+            var listPlayers = findObjs({
+                _type: "player",
+                _online: true
+            });
+            _.each(listPlayers, function(player){
+                log("Checking player: " + player.get('displayname'));
+                if(playerIsGM(player)){
+                    log(player.get('displayname') + " is a GM, setting them to controlling!");
+                    return player;
+                }
+            });
+        }
 	},
     
     findTokenAtTarget = function(){
@@ -352,15 +410,19 @@ var BattleMaster = BattleMaster || (function() {
         log('The turn has changed!');
         var turnorder;
         //Find all the information on whose turn it is
+        log("Turnorder: " + Campaign().get('turnorder'));
         currentTurnToken = new tokenWrapper(findCurrentTurnToken(Campaign().get('turnorder')));
+        log("CurrentTurnToken: " + JSON.stringify(currentTurnToken));
         currentTurnCharacter = getObj('character',currentTurnToken.token.get('represents'));
+        log("CurrentTurnCharacter: " + JSON.stringify(currentTurnCharacter));
         currentTurnPlayer = getObj('player',findWhoIsControlling(currentTurnCharacter));
+        log("CurrentTurnPlayer: " + JSON.stringify(currentTurnPlayer));
         currentPlayerDisplayName = currentTurnPlayer.get('displayname');
         if (!turnorder) 
 			{turnorder = Campaign().get('turnorder');}
 		if (!turnorder) 
 			{return undefined;}
-		if (typeof(turnorder) === 'string') 
+		if (typeof(turnorder) === 'string')
 			{turnorder = JSON.parse(turnorder);}
         //Reset all the variables for the new turn
         ResetTokenTurnValues(currentTurnToken);
@@ -907,9 +969,21 @@ var BattleMaster = BattleMaster || (function() {
     
     applyDamage = function(dmgAmt, dmgType, targetToken, targetCharacter){
         log("Applying " + dmgAmt +" " +  dmgType + " damage to " + targetToken.get('name'));
-        var immunitiesRaw = getAttrByName(targetCharacter.id,"npc_immunities"),
-        resistancesRaw = getAttrByName(targetCharacter.id,"npc_resistances"),
-        vulnerabilitiesRaw = getAttrByName(targetCharacter.id,"npc_vulnerabilities");
+        switch(sCharacterSheetType){
+            case "5e OGL":
+                var immunitiesRaw = getAttrByName(targetCharacter.id,"npc_immunities"),
+                resistancesRaw = getAttrByName(targetCharacter.id,"npc_resistances"),
+                vulnerabilitiesRaw = getAttrByName(targetCharacter.id,"npc_vulnerabilities"); 
+            break;
+            case "5e Shaped":
+                var immunitiesRaw = getAttrByName(targetCharacter.id,"damage_immunities"),
+                resistancesRaw = getAttrByName(targetCharacter.id,"damage_resistances"),
+                vulnerabilitiesRaw = getAttrByName(targetCharacter.id,"damage_vulnerabilities");
+                if(!immunitiesRaw){immunitiesRaw = "";}
+                if(!resistancesRaw){resistancesRaw="";}
+                if(!vulnerabilitiesRaw){vulnerabilitiesRaw="";}
+            break;
+        }
         log(universalizeString(resistancesRaw));
         if(immunitiesRaw != undefined && universalizeString(immunitiesRaw).indexOf(universalizeString(dmgType)) != -1){
             if(bDeathMarkersPlusInstalled){
@@ -995,4 +1069,4 @@ on('ready',function(){
     'use strict';
     
     BattleMaster.RegisterEventHandlers();
-})
+});

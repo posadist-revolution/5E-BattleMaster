@@ -27,3 +27,4 @@ In order to use AOE spells, you must slightly change the "range" variable of the
 * Added a bunch of objects to clarify code
 * Added compatibility with DeathMarkersPlus to check for dead or bloodied tokens
 * Removed deadname
+* Added compatibility with 5e Shaped Sheet
