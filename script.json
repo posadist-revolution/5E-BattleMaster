@@ -12,7 +12,8 @@
         "bar3_value": "read,write",
         "bar3_max":"read",
         "bar1_value":"read,write",
-        "bar1_max":"read"
+        "bar1_max":"read",
+        "bar2_value":"read,write"
     },
     "conflicts":[]
 }
