@@ -15,7 +15,6 @@ var BattleMaster = BattleMaster || (function() {
     listRollCallbackFunctions = [],
     listPlayerIDsWaitingOnRollFrom = [],
     listSelectableGraphics = [],
-    bDeathMarkersPlusInstalled, sCharacterSheetType,
     defaults = {
             css: {
                 button: {
@@ -30,7 +29,12 @@ var BattleMaster = BattleMaster || (function() {
             }
         },
     templates = {};
-    sCharacterSheetType = "5e Shaped";
+    if(!state.bDeathMarkersPlusInstalled){
+        state.bDeathMarkersPlusInstalled = false;
+    }
+    if(!state.sCharacterSheetType){
+        state.sCharacterSheetType = "Shaped";
+    }
     /* OBJECTS */
     function rollData(rollMsg){
         log("Creating RollData object!");
@@ -47,8 +51,8 @@ var BattleMaster = BattleMaster || (function() {
         this.rangeString = "";
         this.saveType = "";
         this.saveEffects = "";
-        switch(sCharacterSheetType){
-            case "5e OGL":
+        switch(state.sCharacterSheetType){
+            case "OGL":
                 this.bRequiresSavingThrow = (universalizeString(rollMsg.content).indexOf("saveattr") != -1);
                 var r1Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{r1=$[[") + 8, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{r1=$[[") + 8,"]]")),10),
                 r2Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{r2=$[[") + 8, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{r2=$[[") + 8,"]]")),10),
@@ -63,7 +67,7 @@ var BattleMaster = BattleMaster || (function() {
                 this.saveType = rollMsg.content.substring(rollMsg.content.indexOf("{{saveattr=") + 11, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("saveattr=") + 11,"}}"));
                 this.saveEffects = rollMsg.content.substring(rollMsg.content.indexOf("savedesc=") + 9, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("savedesc=") + 9,"}}"));
             break;
-            case "5e Shaped":
+            case "Shaped":
                 this.bRequiresSavingThrow = (universalizeString(rollMsg.content).indexOf("saving_throw_vs_ability") != -1);
                 if(this.bRequiresSavingThrow){
                     dmg1Index=parseInt(stringBetween(rollMsg.content,"{{saving_throw_damage=$[[","]]"),10);
@@ -178,7 +182,7 @@ var BattleMaster = BattleMaster || (function() {
         });
     },
     
-    promptButtonArray = function(promptName, listPromptableItems,listCommandNames){
+    promptButtonArray = function(promptName, listPromptableItems, listCommandNames, sPlayerDisplayName){
         var stringToSend, 
             buttonArray = [];
             /*
@@ -196,7 +200,7 @@ var BattleMaster = BattleMaster || (function() {
         for(var i = 0; i < listPromptableItems.length; i++){
             buttonArray[i] = makeButton('!combat ' + listCommandNames[i], listPromptableItems[i], '#CDAE88', 'black');
         }
-        stringToSend = '/w "' + currentPlayerDisplayName + '" '
+        stringToSend = '/w "' + sPlayerDisplayName + '" '
             +'<div style="border: 1px solid black; background-color: white; padding: 3px 3px;">'
             +'<div style="font-weight: bold; border-bottom: 1px solid black;font-size: 130%;">'
             +promptName
@@ -221,7 +225,7 @@ var BattleMaster = BattleMaster || (function() {
         }).id;
         sendPing(currentTurnToken.token.get('left'), currentTurnToken.token.get('top')- distanceToPixels(5), null, true);
         log("Reticle token ID: " + reticleTokenId);
-        promptButtonArray("Move the target to where you would like to attack", ["Target selected"], ["selectedTarget"])
+        promptButtonArray("Move the target to where you would like to attack", ["Target selected"], ["selectedTarget"], currentPlayerDisplayName);
     },
     
     findCurrentTurnToken = function(turnorder) {
@@ -296,7 +300,7 @@ var BattleMaster = BattleMaster || (function() {
                     listCommandNames.push("tokenfromlist " + i);
                 }
                 log("List of potential targets is more than one long!");
-                promptButtonArray("Which token are you targeting?",listTokenNames,listCommandNames);
+                promptButtonArray("Which token are you targeting?",listTokenNames,listCommandNames,currentPlayerDisplayName);
             }
             else if(listSelectableGraphics.length === 1){
                 target = new tokenWrapper(listSelectableGraphics[0]);
@@ -343,8 +347,6 @@ var BattleMaster = BattleMaster || (function() {
                     break;
 		            case 'stop' : StopCombat(); 
                     break;
-		            case 'test' : promptButtonArray('gm', ['Option 1','Option 2', 'Option 3']); 
-                    break;
                     case 'weaponattack': 
                                 promptTarget();
                                 selectedTokenCallbackFunction = WeaponAttack;
@@ -379,6 +381,38 @@ var BattleMaster = BattleMaster || (function() {
                     break;
                     case 'tokenfromlist':
                         target = listSelectableGraphics[args[2]];
+                    break;
+                    case "config":
+                        var s = msg.who; 
+                        if(msg.who.indexOf(" (GM)") != -1){
+                            s = s.substring(0,s.indexOf(" (GM)"));
+                        }
+                        promptButtonArray("5E BattleMaster Config", ["DeathMarkersPlus","Character Sheet"], ["DMPConfig", "SheetConfig"], s);
+                    break;
+                    case "DMPConfig":
+                        var s = msg.who; 
+                        if(msg.who.indexOf(" (GM)") != -1){
+                            s = s.substring(0,s.indexOf(" (GM)"));
+                        }
+                        if(args[2]){
+                            state.bDeathMarkersPlusInstalled = args[2];
+                            sendChat('BattleMaster', '/w "' + s + '" Deathmarkersplus compatibility set to ' + state.bDeathMarkersPlusInstalled);
+                        }
+                        else{
+                            promptButtonArray("DeathMarkersPlus Compatibility",["On", "Off"],["DMPConfig true", "DMPConfig false"], s);
+                        }
+                    break;
+                    case "SheetConfig":
+                        if(args[2]){
+                            state.sCharacterSheetType = args[2];
+                        }
+                        else{
+                            var s = msg.who; 
+                            if(msg.who.indexOf(" (GM)") != -1){
+                                s = s.substring(0,s.indexOf(" (GM)"));
+                            }
+                            promptButtonArray("Character Sheet Type",["OGL", "Shaped"],["SheetConfig OGL", "SheetConfig Shaped"], s);
+                        }
                     break;
 		            //default: break;
 		        }break;
@@ -432,7 +466,7 @@ var BattleMaster = BattleMaster || (function() {
         log('It\'s now ' + currentTurnCharacter.get('name') + '\'s turn!' );
         log('This character is controlled by player ' + currentTurnPlayer.get('displayname'))
         sendChat('BattleMaster','/w "'+ currentTurnPlayer.get('displayname') + '" It\'s your turn as ' + currentTurnToken.name);
-        promptButtonArray("Select an action", generateTurnOptions(),generateTurnOptionCommands());
+        promptButtonArray("Select an action", generateTurnOptions(),generateTurnOptionCommands(), currentPlayerDisplayName);
     },
     
     ResetTokenTurnValues = function(currentTurnTokenWrapper){
@@ -579,7 +613,7 @@ var BattleMaster = BattleMaster || (function() {
             switch(args[1]){
                 case "cone": 
                     promptButtonArray("Select a direction", ["North","South","East","West","Northeast","Northwest","Southeast","Southwest"], 
-                    ["up","down","right","left","upright","upleft","downright","downleft"]);
+                    ["up","down","right","left","upright","upleft","downright","downleft"], currentPlayerDisplayName);
                     bIsWaitingOnResponse = true;
                     responseCallbackFunction = coneDirectionPromptCallback;
                     range = args[2];
@@ -587,7 +621,7 @@ var BattleMaster = BattleMaster || (function() {
                 break;
                 case "line": 
                     promptButtonArray("Select a direction", ["North","South","East","West","Northeast","Northwest","Southeast","Southwest"], 
-                    ["up","down","right","left","upright","upleft","downright","downleft"]);
+                    ["up","down","right","left","upright","upleft","downright","downleft"], currentPlayerDisplayName);
                     bIsWaitingOnResponse = true;
                     responseCallbackFunction = lineDirectionPromptCallback;
                     range = args[2];
@@ -935,12 +969,12 @@ var BattleMaster = BattleMaster || (function() {
         rollDC,
         rollDmg = currentlyCastingSpellRoll.dmgRolls[0].results.total,
         rollDmgType = currentlyCastingSpellRoll.dmgTypes[0];
-        switch(sCharacterSheetType){
-            case "5e OGL":
+        switch(state.sCharacterSheetType){
+            case "OGL":
                 rollDC = currentlyCastingSpellRoll.dc.results.total;
             break;
 
-            case "5e Shaped":
+            case "Shaped":
                 rollDC = currentlyCastingSpellRoll.dc;
             break;
         }
@@ -962,13 +996,13 @@ var BattleMaster = BattleMaster || (function() {
     
     applyDamage = function(dmgAmt, dmgType, targetToken, targetCharacter){
         log("Applying " + dmgAmt +" " +  dmgType + " damage to " + targetToken.get('name'));
-        switch(sCharacterSheetType){
-            case "5e OGL":
+        switch(state.sCharacterSheetType){
+            case "OGL":
                 var immunitiesRaw = getAttrByName(targetCharacter.id,"npc_immunities"),
                 resistancesRaw = getAttrByName(targetCharacter.id,"npc_resistances"),
                 vulnerabilitiesRaw = getAttrByName(targetCharacter.id,"npc_vulnerabilities"); 
             break;
-            case "5e Shaped":
+            case "Shaped":
                 var immunitiesRaw = getAttrByName(targetCharacter.id,"damage_immunities"),
                 resistancesRaw = getAttrByName(targetCharacter.id,"damage_resistances"),
                 vulnerabilitiesRaw = getAttrByName(targetCharacter.id,"damage_vulnerabilities");
@@ -979,14 +1013,14 @@ var BattleMaster = BattleMaster || (function() {
         }
         log(universalizeString(resistancesRaw));
         if(immunitiesRaw != undefined && universalizeString(immunitiesRaw).indexOf(universalizeString(dmgType)) != -1){
-            if(bDeathMarkersPlusInstalled){
+            if(state.bDeathMarkersPlusInstalled){
                 Deathmarkers.UpdateDeathMarkers(targetToken);
             }
             return;
         }
         else if(vulnerabilitiesRaw != undefined && universalizeString(vulnerabilitiesRaw).indexOf(universalizeString(dmgType)) != -1){
             targetToken.set('bar3_value', targetToken.get('bar3_value') - Math.round(2*dmgAmt));
-            if(bDeathMarkersPlusInstalled){
+            if(state.bDeathMarkersPlusInstalled){
                 Deathmarkers.UpdateDeathMarkers(targetToken);
             }
             return;
@@ -994,14 +1028,14 @@ var BattleMaster = BattleMaster || (function() {
         else if(resistancesRaw != undefined && universalizeString(resistancesRaw).indexOf(universalizeString(dmgType)) != -1){
             log(targetCharacter.get('name') + " has resistance to " + dmgType +" damage!")
             targetToken.set('bar3_value', targetToken.get('bar3_value') - Math.round(dmgAmt/2));
-            if(bDeathMarkersPlusInstalled){
+            if(state.bDeathMarkersPlusInstalled){
                 Deathmarkers.UpdateDeathMarkers(targetToken);
             }
             return;
         }
         else{
             targetToken.set('bar3_value', targetToken.get('bar3_value') - Math.round(dmgAmt));
-            if(bDeathMarkersPlusInstalled){
+            if(state.bDeathMarkersPlusInstalled){
                 Deathmarkers.UpdateDeathMarkers(targetToken);
             }
             return;
