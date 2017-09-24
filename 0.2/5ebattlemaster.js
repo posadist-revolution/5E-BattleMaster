@@ -35,6 +35,7 @@ var BattleMaster = BattleMaster || (function() {
     function rollData(rollMsg){
         log("Creating RollData object!");
         var inlineData = rollMsg.inlinerolls;
+        var r1Index = -1, r2Index = -1, dmg1Index = -1, dmg2Index = -1, crit1Index = -1, crit2Index = -1, saveDCIndex = -1;
         log("Inline data: " + JSON.stringify(inlineData));
         log(rollMsg.content);
         this.playerid = rollMsg.playerid;
@@ -68,12 +69,12 @@ var BattleMaster = BattleMaster || (function() {
                     dmg1Index=parseInt(stringBetween(rollMsg.content,"{{saving_throw_damage=$[[","]]"),10);
                     dmgType1=stringBetween(rollMsg.content,"{{saving_throw_damage_type=","}}");    
                     this.saveType = stringBetween(rollMsg.content,"{{saving_throw_vs_ability=","}}");
+                    this.dc = parseInt(stringBetween(rollMsg.content,"{{saving_throw_dc=","}}"),10);
                     //this.saveEffects = rollMsg.content.substring(rollMsg.content.indexOf("savedesc=") + 9, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("savedesc=") + 9,"}}"));
                 }
-                else{
+                else if(universalizeString(rollMsg.content).indexOf("attack1") != -1){
                     var r1Index = parseInt(stringBetween(rollMsg.content,"{{attack1=$[[","]]"),10);
                     //r2Index = parseInt(rollMsg.content.substring(rollMsg.content.indexOf("{{r2=$[[") + 8, firstIndexAfter(rollMsg.content,rollMsg.content.indexOf("{{r2=$[[") + 8,"]]")),10),
-                    this.dc = parseInt(stringBetween(rollMsg.content,"{{saving_throw_dc=$[[","]]"),10);
                     var dmg1Index = parseInt(stringBetween(rollMsg.content,"{{attack_damage=$[[","]]"),10),
                     dmg2Index = parseInt(stringBetween(rollMsg.content,"{{attack_second_damage=$[[","]]"),10),
                     crit1Index = parseInt(stringBetween(rollMsg.content,"{{attack_damage_crit=$[[","]]"),10),
@@ -81,20 +82,17 @@ var BattleMaster = BattleMaster || (function() {
                     dmgType1 = stringBetween(rollMsg.content,"{{attack_damage_type=","}}"),
                     dmgType2 = stringBetween(rollMsg.content,"{{attack_second_damage_type=","}}");
                 }
+                else{
+                    var r1Index = parseInt(stringBetween(rollMsg.content,"{{roll1=$[[","]]"),10);
+                }
                 //this.rangeString = rollMsg.content.substring(rollMsg.content.indexOf("{{range=") + 8, firstIndexAfter(rollMsg.content, rollMsg.content.indexOf("{{range=") + 8, "}}"));
             break;
         }
-        log("Roll 1: "+ r1Index + "  Roll 2: " + r2Index);
-        this.d20Rolls.push(inlineData[r1Index]);
-        this.d20Rolls.push(inlineData[r2Index]);
-        this.dc = inlineData[saveDCIndex];
-        this.dmgRolls.push(inlineData[dmg1Index]);//this.dmgRolls.push(inlineData[dmg2Index]);
-        this.dmgTypes.push(universalizeString(dmgType1));
-        if(dmg2Index){
-            log("Dmg2Index: " + dmg2Index);
-            this.dmgRolls.push(inlineData[dmg2Index]);
-            this.dmgTypes.push(universalizeString(dmgType2));
-        }
+        if(r1Index != -1){this.d20Rolls.push(inlineData[r1Index]);}
+        if(r2Index != -1){this.d20Rolls.push(inlineData[r2Index]);}
+        if(saveDCIndex != -1){this.dc = inlineData[saveDCIndex]; log("SaveDCIndex isn't negative one!");}
+        if(dmg1Index != -1){this.dmgRolls.push(inlineData[dmg1Index]); this.dmgTypes.push(universalizeString(dmgType1));}
+        if(dmg2Index != -1){this.dmgRolls.push(inlineData[dmg2Index]); this.dmgTypes.push(universalizeString(dmgType2));}
     }
     function location(x,y,z){
         this.x = x;
@@ -924,35 +922,30 @@ var BattleMaster = BattleMaster || (function() {
     },
     
     SavingThrowAgainstDamageRollCallback = function(rollData){
-        log("Waiting on rolls for the following tokens: ");
-        _.each(listTokensWaitingOnSavingThrowsFrom, function(token){
-            log(token.token.get('name'));
-        });
         for(var i = 0; i < listTokensWaitingOnSavingThrowsFrom.length; i++){
             if(findWhoIsControlling(listTokensWaitingOnSavingThrowsFrom[i].associatedCharacter) === rollData.playerid){
                 var token = listTokensWaitingOnSavingThrowsFrom[i];
                 listTokensWaitingOnSavingThrowsFrom.splice(i,1);
-                log("Found correct token, breaking out of the loop!");
                 break;
             }
         }
-        log("Waiting on rolls for the following tokens: ");
-        _.each(listTokensWaitingOnSavingThrowsFrom, function(token){
-            log(token.token.get('name'));
-        });
         sendChat("BattleMaster",'/w "' + currentPlayerDisplayName +'" Recieved roll for ' + token.token.get("name"));
         var rollAttribute = currentlyCastingSpellRoll.saveType,
         rollEffectsDesc = currentlyCastingSpellRoll.saveEffects,
-        rollDC = currentlyCastingSpellRoll.dc.results.total,
+        rollDC,
         rollDmg = currentlyCastingSpellRoll.dmgRolls[0].results.total,
         rollDmgType = currentlyCastingSpellRoll.dmgTypes[0];
-        log("Potential damage: " + rollDmg);
-        log("Damage type: "+ rollDmgType);
+        switch(sCharacterSheetType){
+            case "5e OGL":
+                rollDC = currentlyCastingSpellRoll.dc.results.total;
+            break;
+
+            case "5e Shaped":
+                rollDC = currentlyCastingSpellRoll.dc;
+            break;
+        }
         var savingThrowRoll = rollData.d20Rolls[0].results.total;
-        log("Saving throw roll: " + savingThrowRoll);
-        log("rollDC: " + rollDC);
         if(savingThrowRoll >= rollDC){
-            log("Succeeded on saving throw roll! Effects: " + universalizeString(rollEffectsDesc));
             //SAVING THROW EFFECTS GO HERE
             switch(universalizeString(rollEffectsDesc)){
                 case "halfdamage":
